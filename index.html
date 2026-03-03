@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live People Counter</title>
+  <style>
+    body { font-family: Arial; text-align:center; margin-top:50px; }
+    #count { font-size:100px; }
+  </style>
+</head>
+<body>
+
+<h1>Live People Count</h1>
+<div id="count">0</div>
+
+<script type="module">
+import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot";
+
+let latestCount = 0;
+
+async function sendToAirtable(count) {
+  await fetch("https://api.airtable.com/v0/YOUR_BASE_ID/Counts", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer YOUR_AIRTABLE_TOKEN",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      fields: {
+        timestamp: new Date().toISOString(),
+        people_count: count
+      }
+    })
+  });
+}
+
+const vision = new RealtimeVision({
+  apiKey: "ovs_b821bdbcb764e108ba2c4ffaa8d75d58",
+  source: { type: 'camera' },
+  prompt: "Return ONLY an integer: the number of people visible in the frame.",
+  onResult: (result) => {
+    if (!result.ok) return;
+
+    const num = parseInt(result.result.trim(), 10);
+    if (!Number.isFinite(num)) return;
+
+    latestCount = num;
+    document.getElementById("count").innerText = num;
+  }
+});
+
+await vision.start();
+
+let lastSent = -1;
+
+setInterval(() => {
+  if (latestCount !== lastSent) {
+    sendToAirtable(latestCount);
+    lastSent = latestCount;
+  }
+}, 5000);
+
+</script>
+
+</body>
+</html>
