@@ -1,63 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Live People Counter</title>
   <style>
-    body { font-family: Arial; text-align:center; margin-top:50px; }
-    #count { font-size:100px; }
+    body { font-family: Arial, sans-serif; text-align:center; margin: 40px 16px; }
+    #count { font-size: 96px; margin: 10px 0 0; }
+    #status { margin-top: 14px; font-size: 14px; opacity: 0.8; white-space: pre-line; }
+    .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; border: 1px solid #ddd; }
   </style>
 </head>
 <body>
 
-<h1>Live People Count</h1>
-<div id="count">0</div>
+  <h1>Live People Count</h1>
+  <div id="count">0</div>
+  <div id="status" class="pill">Initializing…</div>
 
-<script type="module">
-import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot";
+  <script type="module">
+    import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot";
 
-let latestCount = 0;
+    const countEl = document.getElementById("count");
+    const statusEl = document.getElementById("status");
 
-async function sendToAirtable(count) {
-  await fetch("/api/log", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      people_count: count,
-      timestamp: new Date().toISOString()
-    })
-  });
-}
+    let latestCount = 0;
+    let lastSent = null; // null so first send always happens
+    let lastResultAt = null;
 
-const vision = new RealtimeVision({
-  apiKey: "ovs_b821bdbcb764e108ba2c4ffaa8d75d58",
-  source: { type: 'camera' },
-  prompt: "Return ONLY an integer: the number of people visible in the frame.",
-  onResult: (result) => {
-    if (!result.ok) return;
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
 
-    const num = parseInt(result.result.trim(), 10);
-    if (!Number.isFinite(num)) return;
+    async function getConfig() {
+      // Expects: { overshootKey: "ovs_..." }
+      const res = await fetch("/api/config", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Config error: ${res.status}`);
+      const cfg = await res.json();
+      if (!cfg?.overshootKey) throw new Error("Missing overshootKey in /api/config response");
+      return cfg;
+    }
 
-    latestCount = num;
-    document.getElementById("count").innerText = num;
-  }
-});
+    async function sendToAirtable(count) {
+      // Sends to your Vercel serverless function (api/log.js), which writes to Airtable
+      const res = await fetch("/api/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          people_count: count,
+          timestamp: new Date().toISOString()
+        })
+      });
 
-await vision.start();
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Airtable log failed (${res.status}): ${text}`);
+      }
+    }
 
-let lastSent = -1;
+    function safeParseInt(s) {
+      // Handles cases where model returns whitespace/newlines etc.
+      const n = parseInt(String(s).trim(), 10);
+      return Number.isFinite(n) ? n : null;
+    }
 
-setInterval(() => {
-  if (latestCount !== lastSent) {
-    sendToAirtable(latestCount);
-    lastSent = latestCount;
-  }
-}, 5000);
+    try {
+      setStatus("Loading config…");
+      const cfg = await getConfig();
 
-</script>
+      setStatus("Requesting camera permission…");
+
+      const vision = new RealtimeVision({
+        apiKey: cfg.overshootKey,
+        source: { type: "camera" },
+        prompt: "Return ONLY an integer: the number of people visible in the frame.",
+        onResult: (result) => {
+          if (!result?.ok) return;
+
+          const num = safeParseInt(result.result);
+          if (num === null) return;
+
+          latestCount = num;
+          lastResultAt = new Date();
+
+          countEl.innerText = String(num);
+          setStatus(`Streaming… last model update: ${lastResultAt.toLocaleTimeString()}\nLast sent: ${lastSent === null ? "never" : lastSent}`);
+        }
+      });
+
+      await vision.start();
+      setStatus("Streaming… (waiting for first result)");
+
+      // Send every 5 seconds, only if count changed
+      setInterval(async () => {
+        try {
+          if (latestCount !== lastSent) {
+            await sendToAirtable(latestCount);
+            lastSent = latestCount;
+
+            setStatus(`Streaming… last model update: ${lastResultAt ? lastResultAt.toLocaleTimeString() : "n/a"}\nLast sent: ${lastSent} @ ${new Date().toLocaleTimeString()}`);
+          }
+        } catch (err) {
+          setStatus(`Error sending to Airtable:\n${err?.message || err}`);
+        }
+      }, 5000);
+
+    } catch (err) {
+      setStatus(`Startup error:\n${err?.message || err}`);
+    }
+  </script>
 
 </body>
-
 </html>
