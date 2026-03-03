@@ -7,8 +7,8 @@
   <style>
     body { font-family: Arial, sans-serif; text-align:center; margin: 40px 16px; }
     #count { font-size: 96px; margin: 10px 0 0; }
-    #status { margin-top: 14px; font-size: 14px; opacity: 0.8; white-space: pre-line; }
-    .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; border: 1px solid #ddd; }
+    #status { margin-top: 14px; font-size: 14px; opacity: 0.85; white-space: pre-line; }
+    .pill { display:inline-block; padding: 8px 12px; border-radius: 999px; border: 1px solid #ddd; }
   </style>
 </head>
 <body>
@@ -24,24 +24,27 @@
     const statusEl = document.getElementById("status");
 
     let latestCount = 0;
-    let lastSent = null; // null so first send always happens
-    let lastResultAt = null;
+    let lastSent = null;
+    let lastModelUpdateAt = null;
 
     function setStatus(msg) {
       statusEl.textContent = msg;
     }
 
+    function safeParseInt(val) {
+      const n = parseInt(String(val).trim(), 10);
+      return Number.isFinite(n) ? n : null;
+    }
+
     async function getConfig() {
-      // Expects: { overshootKey: "ovs_..." }
       const res = await fetch("/api/config", { cache: "no-store" });
-      if (!res.ok) throw new Error(`Config error: ${res.status}`);
+      if (!res.ok) throw new Error(`Config fetch failed: ${res.status}`);
       const cfg = await res.json();
-      if (!cfg?.overshootKey) throw new Error("Missing overshootKey in /api/config response");
+      if (!cfg?.overshootKey) throw new Error("Missing overshootKey from /api/config");
       return cfg;
     }
 
     async function sendToAirtable(count) {
-      // Sends to your Vercel serverless function (api/log.js), which writes to Airtable
       const res = await fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,14 +56,8 @@
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Airtable log failed (${res.status}): ${text}`);
+        throw new Error(`Log failed (${res.status}): ${text}`);
       }
-    }
-
-    function safeParseInt(s) {
-      // Handles cases where model returns whitespace/newlines etc.
-      const n = parseInt(String(s).trim(), 10);
-      return Number.isFinite(n) ? n : null;
     }
 
     try {
@@ -80,24 +77,32 @@
           if (num === null) return;
 
           latestCount = num;
-          lastResultAt = new Date();
+          lastModelUpdateAt = new Date();
 
           countEl.innerText = String(num);
-          setStatus(`Streaming… last model update: ${lastResultAt.toLocaleTimeString()}\nLast sent: ${lastSent === null ? "never" : lastSent}`);
+          setStatus(
+            `Streaming… last model update: ${lastModelUpdateAt.toLocaleTimeString()}\n` +
+            `Latest count: ${latestCount}\n` +
+            `Last sent: ${lastSent === null ? "never" : lastSent}`
+          );
         }
       });
 
       await vision.start();
-      setStatus("Streaming… (waiting for first result)");
+      setStatus("Streaming… (waiting for first model result)");
 
-      // Send every 5 seconds, only if count changed
+      // Send every 5 seconds only when value changes
       setInterval(async () => {
         try {
           if (latestCount !== lastSent) {
             await sendToAirtable(latestCount);
             lastSent = latestCount;
 
-            setStatus(`Streaming… last model update: ${lastResultAt ? lastResultAt.toLocaleTimeString() : "n/a"}\nLast sent: ${lastSent} @ ${new Date().toLocaleTimeString()}`);
+            setStatus(
+              `Streaming… last model update: ${lastModelUpdateAt ? lastModelUpdateAt.toLocaleTimeString() : "n/a"}\n` +
+              `Latest count: ${latestCount}\n` +
+              `Last sent: ${lastSent} @ ${new Date().toLocaleTimeString()}`
+            );
           }
         } catch (err) {
           setStatus(`Error sending to Airtable:\n${err?.message || err}`);
