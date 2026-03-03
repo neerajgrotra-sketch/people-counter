@@ -18,17 +18,14 @@ import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot";
 let latestCount = 0;
 
 async function sendToAirtable(count) {
-  await fetch("https://api.airtable.com/v0/YOUR_BASE_ID/Counts", {
+  await fetch("/api/log", {
     method: "POST",
     headers: {
-      "Authorization": "Bearer YOUR_AIRTABLE_TOKEN",
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      fields: {
-        timestamp: new Date().toISOString(),
-        people_count: count
-      }
+      people_count: count,
+      timestamp: new Date().toISOString()
     })
   });
 }
@@ -62,4 +59,5 @@ setInterval(() => {
 </script>
 
 </body>
+
 </html>
