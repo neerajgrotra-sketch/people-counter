@@ -1,51 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
   <title>Live People Counter</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align:center; margin: 40px 16px; }
-    #count { font-size: 96px; margin: 10px 0 0; }
-    #status { margin-top: 14px; font-size: 14px; opacity: 0.85; white-space: pre-line; }
-    .pill { display:inline-block; padding: 8px 12px; border-radius: 999px; border: 1px solid #ddd; }
+    body { font-family: Arial; text-align:center; margin-top:50px; }
+    #count { font-size:100px; }
+    #status { margin-top: 10px; opacity: 0.8; }
   </style>
 </head>
 <body>
-
   <h1>Live People Count</h1>
   <div id="count">0</div>
-  <div id="status" class="pill">Initializing…</div>
+  <div id="status">Initializing…</div>
 
   <script type="module">
-    import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot/dist/index.js";
-
-    const countEl = document.getElementById("count");
     const statusEl = document.getElementById("status");
+    const countEl = document.getElementById("count");
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    // 1) Get Overshoot key from server (keeps it out of GitHub)
+    const cfg = await fetch("/api/config").then(r => r.json());
+    const overshootKey = cfg.overshootKey;
+    if (!overshootKey) throw new Error("Missing overshootKey from /api/config");
+
+    // 2) Load Overshoot SDK from CDN and inspect exports
+    import * as Overshoot from "https://cdn.jsdelivr.net/npm/overshoot/dist/index.js";
+    console.log("Overshoot exports:", Overshoot);
+
+    // 3) Pick the correct constructor from the SDK exports
+    const RealtimeVision =
+      Overshoot.RealtimeVision ||
+      Overshoot.default ||
+      Overshoot.Vision ||
+      Overshoot.RealtimeVisionClient;
+
+    if (!RealtimeVision) {
+      setStatus("Overshoot SDK loaded, but RealtimeVision not found. Check console exports.");
+      throw new Error("Could not find RealtimeVision constructor in Overshoot exports.");
+    }
 
     let latestCount = 0;
-    let lastSent = null;
-    let lastModelUpdateAt = null;
-
-    function setStatus(msg) {
-      statusEl.textContent = msg;
-    }
-
-    function safeParseInt(val) {
-      const n = parseInt(String(val).trim(), 10);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    async function getConfig() {
-      const res = await fetch("/api/config", { cache: "no-store" });
-      if (!res.ok) throw new Error(`Config fetch failed: ${res.status}`);
-      const cfg = await res.json();
-      if (!cfg?.overshootKey) throw new Error("Missing overshootKey from /api/config");
-      return cfg;
-    }
+    let lastSent = -1;
 
     async function sendToAirtable(count) {
-      const res = await fetch("/api/log", {
+      await fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -53,67 +53,37 @@
           timestamp: new Date().toISOString()
         })
       });
+    }
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Log failed (${res.status}): ${text}`);
+    // 4) Start webcam vision
+    setStatus("Requesting camera permission…");
+
+    const vision = new RealtimeVision({
+      apiKey: overshootKey,
+      source: { type: "camera" },
+      prompt: "Return ONLY an integer: the number of people visible in the frame.",
+      onResult: (result) => {
+        if (!result?.ok) return;
+
+        const num = parseInt(String(result.result || "").trim(), 10);
+        if (!Number.isFinite(num)) return;
+
+        latestCount = num;
+        countEl.textContent = String(num);
+        setStatus("Streaming…");
       }
-    }
+    });
 
-    try {
-      setStatus("Loading config…");
-      const cfg = await getConfig();
+    await vision.start();
 
-      setStatus("Requesting camera permission…");
+    // 5) Send count changes to Airtable every 5 seconds
+    setInterval(() => {
+      if (latestCount !== lastSent) {
+        sendToAirtable(latestCount).catch(err => console.error("Airtable log error:", err));
+        lastSent = latestCount;
+      }
+    }, 5000);
 
-      const vision = new RealtimeVision({
-        apiKey: cfg.overshootKey,
-        source: { type: "camera" },
-        prompt: "Return ONLY an integer: the number of people visible in the frame.",
-        onResult: (result) => {
-          if (!result?.ok) return;
-
-          const num = safeParseInt(result.result);
-          if (num === null) return;
-
-          latestCount = num;
-          lastModelUpdateAt = new Date();
-
-          countEl.innerText = String(num);
-          setStatus(
-            `Streaming… last model update: ${lastModelUpdateAt.toLocaleTimeString()}\n` +
-            `Latest count: ${latestCount}\n` +
-            `Last sent: ${lastSent === null ? "never" : lastSent}`
-          );
-        }
-      });
-
-      await vision.start();
-      setStatus("Streaming… (waiting for first model result)");
-
-      // Send every 5 seconds only when value changes
-      setInterval(async () => {
-        try {
-          if (latestCount !== lastSent) {
-            await sendToAirtable(latestCount);
-            lastSent = latestCount;
-
-            setStatus(
-              `Streaming… last model update: ${lastModelUpdateAt ? lastModelUpdateAt.toLocaleTimeString() : "n/a"}\n` +
-              `Latest count: ${latestCount}\n` +
-              `Last sent: ${lastSent} @ ${new Date().toLocaleTimeString()}`
-            );
-          }
-        } catch (err) {
-          setStatus(`Error sending to Airtable:\n${err?.message || err}`);
-        }
-      }, 5000);
-
-    } catch (err) {
-      setStatus(`Startup error:\n${err?.message || err}`);
-    }
   </script>
-
 </body>
 </html>
-
