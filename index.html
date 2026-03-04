@@ -1,575 +1,319 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Live People Counter</title>
   <style>
     :root{
-      --bg:#070b14;
-      --card:#0c1426;
-      --card2:#0a1020;
-      --text:#eaf0ff;
-      --muted:#9fb0d0;
-      --accent:#2f6bff;
-      --good:#18c97a;
-      --bad:#ff4d4d;
-      --warn:#ffb020;
-      --border: rgba(255,255,255,0.08);
-      --shadow: 0 20px 80px rgba(0,0,0,0.55);
-      --radius: 22px;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --bg:#0b1220; --card:#111b2e; --muted:#93a4c7; --text:#eaf0ff;
+      --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444; --btn:#2563eb;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
-
-    *{ box-sizing:border-box; }
-    body{
-      margin:0;
-      font-family: var(--sans);
-      color:var(--text);
-      background:
-        radial-gradient(1200px 600px at 20% 0%, rgba(47,107,255,0.35), transparent 60%),
-        radial-gradient(900px 500px at 95% 20%, rgba(24,201,122,0.18), transparent 55%),
-        radial-gradient(800px 500px at 50% 100%, rgba(255,176,32,0.12), transparent 55%),
-        var(--bg);
-      min-height:100vh;
-      padding:28px 22px 34px;
-    }
-
-    h1{
-      margin: 0 0 6px 0;
-      font-size: clamp(34px, 4vw, 56px);
-      letter-spacing: -0.02em;
-    }
-    .sub{
-      margin:0 0 22px 0;
-      color:var(--muted);
-      font-size: 16px;
-      line-height: 1.4;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns: 1.5fr 1fr;
-      gap:18px;
-      align-items: start;
-    }
-    @media (max-width: 980px){
-      .grid{ grid-template-columns: 1fr; }
-    }
-
-    .card{
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), transparent 35%),
-                  rgba(12,20,38,0.85);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px 18px 16px;
-      overflow:hidden;
-    }
-    .card .label{
-      font-size: 13px;
-      color: var(--muted);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
-    .count{
-      font-size: clamp(64px, 6vw, 110px);
-      font-weight: 800;
-      line-height: 1;
-      margin: 4px 0 14px;
-      letter-spacing: -0.03em;
-    }
-
-    .row{
-      display:flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items:center;
-    }
-
+    body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text); }
+    .wrap{ max-width: 1100px; margin: 28px auto; padding: 0 16px; }
+    h1{ margin:0 0 6px; font-size: 44px; letter-spacing:-0.02em; }
+    .sub{ color:var(--muted); margin:0 0 18px; }
+    .grid{ display:grid; grid-template-columns: 1.2fr 0.8fr; gap:16px; }
+    .card{ background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); border:1px solid rgba(255,255,255,0.08);
+      border-radius:18px; padding:18px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+    .label{ font-size:12px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
+    #count{ font-size: 78px; font-weight: 800; margin: 8px 0 14px; }
+    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
     button{
-      border: 0;
-      border-radius: 14px;
-      padding: 12px 16px;
-      font-weight: 700;
-      font-size: 16px;
-      cursor: pointer;
-      transition: transform .04s ease, opacity .15s ease;
-      user-select:none;
+      appearance:none; border:0; border-radius:12px; padding:12px 16px; font-weight:700; cursor:pointer;
+      background: var(--btn); color:white;
     }
-    button:active{ transform: translateY(1px); }
-    button.primary{
-      background: var(--accent);
-      color: white;
-      padding: 14px 20px;
-    }
-    button.secondary{
-      background: rgba(255,255,255,0.08);
-      color: var(--text);
-    }
-    button.ghost{
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      font-weight: 650;
-    }
-    button:disabled{
-      opacity:0.55;
-      cursor:not-allowed;
-    }
-
+    button.secondary{ background: rgba(255,255,255,0.10); color: var(--text); }
+    button:disabled{ opacity:0.55; cursor:not-allowed; }
     .pill{
-      border: 1px solid var(--border);
-      padding: 10px 14px;
-      border-radius: 999px;
-      font-size: 14px;
-      color: var(--muted);
-      display:inline-flex;
-      gap:8px;
-      align-items:center;
-      background: rgba(0,0,0,0.20);
-    }
-    .dot{
-      width:10px; height:10px; border-radius:99px; background: rgba(255,255,255,0.25);
-      display:inline-block;
-    }
-    .ok{ color: #bfffe2; border-color: rgba(24,201,122,0.45); background: rgba(24,201,122,0.10); }
-    .ok .dot{ background: var(--good); }
-    .bad{ color: #ffd0d0; border-color: rgba(255,77,77,0.45); background: rgba(255,77,77,0.10); }
-    .bad .dot{ background: var(--bad); }
-    .warn{ color: #ffe7c2; border-color: rgba(255,176,32,0.45); background: rgba(255,176,32,0.10); }
-    .warn .dot{ background: var(--warn); }
-
-    .small{
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .timeBig{
-      font-size: 42px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 0 0 6px 0;
-    }
-    .timeNote{
-      color: var(--muted);
-      margin:0 0 18px 0;
-      font-size: 14px;
-    }
-
-    .debugTitle{
-      margin-top: 4px;
-      font-size: 13px;
-      color: var(--muted);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-    .debugBox{
-      margin-top: 10px;
+      border-radius:999px; padding:10px 12px; font-weight:700; font-size:14px;
+      border:1px solid rgba(255,255,255,0.10);
       background: rgba(0,0,0,0.25);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px;
-      font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.35;
-      color: #d6e0ff;
-      max-height: 190px;
-      overflow:auto;
+    }
+    .pill.ok{ border-color: rgba(22,163,74,0.5); color:#bbf7d0; }
+    .pill.bad{ border-color: rgba(239,68,68,0.5); color:#fecaca; }
+    .pill.warn{ border-color: rgba(245,158,11,0.5); color:#fde68a; }
+    .mono{ font-family: var(--mono); }
+    #time{ font-size: 40px; font-weight: 800; margin-top: 6px; }
+    .tiny{ color:var(--muted); margin-top:6px; }
+    #logs{
+      height: 260px; overflow:auto; background: rgba(0,0,0,0.35); border-radius: 14px;
+      border:1px solid rgba(255,255,255,0.08); padding: 12px;
+      font-family: var(--mono); font-size: 13px; line-height: 1.45;
       white-space: pre-wrap;
     }
-
-    .logsCard{
-      margin-top: 18px;
-    }
-    .logBox{
-      margin-top: 10px;
-      background: rgba(0,0,0,0.28);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px;
-      font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.35;
-      color: #d6e0ff;
-      max-height: 260px;
-      overflow:auto;
-      white-space: pre;
-    }
-
-    .select{
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 14px;
-      color: var(--text);
-      font-size: 14px;
-      outline:none;
-    }
-
-    .mutedMono{
-      color: var(--muted);
-      font-family: var(--mono);
-      font-size: 12px;
-    }
+    video{ width:100%; max-height: 240px; background:black; border-radius: 14px; border:1px solid rgba(255,255,255,0.08); display:none; }
+    .foot{ color:var(--muted); margin-top:10px; font-size: 13px; }
   </style>
 </head>
 
 <body>
-  <h1>Live People Counter</h1>
-  <p class="sub">Uses webcam + Overshoot for people counting and logs counts to Airtable via <span class="mutedMono">/api/log</span>.</p>
+  <div class="wrap">
+    <h1>Live People Counter</h1>
+    <p class="sub">Uses webcam + Overshoot for people counting and logs counts to Airtable via <span class="mono">/api/log</span>.</p>
 
-  <div class="grid">
-    <!-- LEFT -->
-    <div class="card">
-      <div class="label">People Count</div>
-      <div id="count" class="count">0</div>
+    <div class="grid">
+      <div class="card">
+        <div class="label">People Count</div>
+        <div id="count">—</div>
 
-      <div class="row" style="margin-bottom:10px;">
-        <button id="startBtn" class="primary">Start Camera</button>
-        <button id="stopBtn" class="secondary" disabled>Stop</button>
+        <div class="row" style="margin-bottom:10px;">
+          <button id="btnStart">Start Camera</button>
+          <button id="btnStop" class="secondary" disabled>Stop</button>
+          <button id="btnValidate" class="secondary">Validate Connections (send 9999)</button>
 
-        <span id="cameraPill" class="pill warn"><span class="dot"></span><span>Camera: idle</span></span>
-        <span id="airtablePill" class="pill warn"><span class="dot"></span><span>Airtable: idle</span></span>
+          <span id="pillCamera" class="pill warn">Camera: idle</span>
+          <span id="pillOvershoot" class="pill warn">Overshoot: idle</span>
+          <span id="pillAirtable" class="pill warn">Airtable: idle</span>
+        </div>
+
+        <video id="preview" autoplay playsinline muted></video>
+
+        <div class="foot">
+          Sends an update every <b>5 seconds</b> when the count changes.
+        </div>
       </div>
 
-      <div class="row" style="margin-bottom:8px;">
-        <button id="validateBtn" class="ghost">Validate Connections (send 9999)</button>
-        <span id="validatePill" class="pill warn"><span class="dot"></span><span>Validate: idle</span></span>
+      <div class="card">
+        <div class="label">Date &amp; Time</div>
+        <div id="time">—</div>
+        <div class="tiny">Local browser time.</div>
+
+        <div style="height:12px;"></div>
+        <div class="label">Debug</div>
+        <div id="debug" class="mono" style="color:var(--muted);">
+          Page loaded. Click <b>Start Camera</b> to begin.
+        </div>
       </div>
-
-      <div class="small">Sends an update every <b>5 seconds</b> when the count changes.</div>
-
-      <div class="debugTitle" style="margin-top:16px;">Config</div>
-      <div id="configBox" class="debugBox">Loading...</div>
     </div>
 
-    <!-- RIGHT -->
+    <div style="height:16px;"></div>
+
     <div class="card">
-      <div class="label">Date & Time</div>
-      <div id="timeBig" class="timeBig">--</div>
-      <p class="timeNote">Local browser time.</p>
-
-      <div class="row" style="margin-top:6px;">
-        <label class="pill" style="background:rgba(255,255,255,0.04);">
-          <span class="dot" style="background:rgba(255,255,255,0.25)"></span>
-          <span>Model</span>
-        </label>
-        <select id="modelSelect" class="select">
-          <option value="Qwen/Qwen3-VL-30B-A3B-Instruct">Qwen/Qwen3-VL-30B-A3B-Instruct</option>
-          <option value="Qwen/Qwen3.5-9B">Qwen/Qwen3.5-9B (faster)</option>
-        </select>
-      </div>
-
-      <div class="row" style="margin-top:10px;">
-        <label class="pill" style="background:rgba(255,255,255,0.04);">
-          <span class="dot" style="background:rgba(255,255,255,0.25)"></span>
-          <span>Camera Facing</span>
-        </label>
-        <select id="facingSelect" class="select">
-          <option value="environment">environment (rear/external)</option>
-          <option value="user">user (front)</option>
-        </select>
-      </div>
-
-      <div class="debugTitle" style="margin-top:16px;">Status / Errors</div>
-      <div id="statusBox" class="debugBox">Ready. Click “Start Camera”.</div>
+      <div class="label">Errors / Logs</div>
+      <div id="logs"></div>
     </div>
   </div>
 
-  <div class="card logsCard">
-    <div class="label">Errors / Logs</div>
-    <div id="logBox" class="logBox"></div>
-  </div>
+<script type="module">
+  // ✅ IMPORTANT: Use the ESM build. This avoids:
+  // - "does not provide an export named RealtimeVision"
+  // - "exports is not defined"
+  import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot@2.0.0-alpha.6/dist/index.mjs";
 
-  <script type="module">
-    /*****************************************************************
-     * IMPORTANT:
-     * - Overshoot key is fetched from /api/config (server env)
-     * - Airtable writes are done by /api/log (server env)
-     * - This file contains NO secrets.
-     *****************************************************************/
+  const elCount = document.getElementById("count");
+  const elTime = document.getElementById("time");
+  const elLogs = document.getElementById("logs");
+  const elDebug = document.getElementById("debug");
+  const btnStart = document.getElementById("btnStart");
+  const btnStop = document.getElementById("btnStop");
+  const btnValidate = document.getElementById("btnValidate");
+  const pillCamera = document.getElementById("pillCamera");
+  const pillOvershoot = document.getElementById("pillOvershoot");
+  const pillAirtable = document.getElementById("pillAirtable");
+  const preview = document.getElementById("preview");
 
-    // ---- If your working project already uses a specific import URL, keep it.
-    // For Vercel builds with npm, use: import { RealtimeVision } from "overshoot";
-    // For your current setup, you likely have a browser-friendly import working.
-    // If you are using npm on Vercel, replace the line below with "from 'overshoot'".
-    import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot";
+  let vision = null;
+  let latestCount = null;
+  let lastSent = null;
+  let sendTimer = null;
+  let overshootKey = null;
 
-    const elCount = document.getElementById("count");
-    const elTime = document.getElementById("timeBig");
-    const elLog = document.getElementById("logBox");
-    const elStatus = document.getElementById("statusBox");
-    const elConfig = document.getElementById("configBox");
+  function nowISO(){ return new Date().toISOString(); }
 
-    const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const validateBtn = document.getElementById("validateBtn");
+  function log(msg, level="info"){
+    const stamp = nowISO();
+    const icon = level === "error" ? "✖" : level === "warn" ? "!" : "i";
+    elLogs.textContent = `[${stamp}] ${icon} ${msg}\n` + elLogs.textContent;
+  }
 
-    const cameraPill = document.getElementById("cameraPill");
-    const airtablePill = document.getElementById("airtablePill");
-    const validatePill = document.getElementById("validatePill");
+  function setPill(el, state, text){
+    el.classList.remove("ok","warn","bad");
+    el.classList.add(state);
+    el.textContent = text;
+  }
 
-    const modelSelect = document.getElementById("modelSelect");
-    const facingSelect = document.getElementById("facingSelect");
+  function setDebug(text){ elDebug.textContent = text; }
 
-    let vision = null;
-    let overshootKey = null;
+  // Live clock
+  setInterval(() => {
+    elTime.textContent = new Date().toLocaleString();
+  }, 250);
+  elTime.textContent = new Date().toLocaleString();
 
-    let latestCount = 0;
-    let lastSent = -1;
-    let sendTimer = null;
+  async function fetchJSON(url){
+    const r = await fetch(url, { cache: "no-store" });
+    const t = await r.text();
+    let j = null;
+    try { j = JSON.parse(t); } catch {}
+    if(!r.ok){
+      throw new Error(`${url} -> ${r.status} ${r.statusText}: ${t.slice(0,200)}`);
+    }
+    return j ?? {};
+  }
 
-    function nowIso(){ return new Date().toISOString(); }
-    function fmtLocal(){
-      const d = new Date();
-      return d.toLocaleString(undefined, {
-        year:"numeric", month:"numeric", day:"numeric",
-        hour:"numeric", minute:"2-digit", second:"2-digit"
-      });
+  async function postJSON(url, body){
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const t = await r.text();
+    if(!r.ok){
+      throw new Error(`${url} -> ${r.status} ${r.statusText}: ${t.slice(0,200)}`);
+    }
+    return t;
+  }
+
+  async function validateConnections(){
+    setDebug("Validating connections…");
+    log("Validating connections…");
+
+    // 1) Overshoot config
+    try{
+      const cfg = await fetchJSON("/api/config");
+      overshootKey = cfg.overshootKey;
+      if(!overshootKey) throw new Error("No overshootKey returned from /api/config");
+      setPill(pillOvershoot, "ok", "Overshoot: key ok");
+      log("Loaded Overshoot key from /api/config.");
+    }catch(e){
+      setPill(pillOvershoot, "bad", "Overshoot: error");
+      log(`Overshoot config error: ${e.message}`, "error");
+      throw e;
     }
 
-    function setPill(pill, state, text){
-      pill.classList.remove("ok","bad","warn");
-      pill.classList.add(state);
-      pill.querySelector("span:last-child").textContent = text;
+    // 2) Airtable write test via serverless /api/log
+    try{
+      await postJSON("/api/log", { people_count: 9999, timestamp: nowISO() });
+      setPill(pillAirtable, "ok", "Airtable: ok (sent 9999)");
+      log("Logged to Airtable: people_count=9999");
+    }catch(e){
+      setPill(pillAirtable, "bad", "Airtable: error");
+      log(`Airtable log error: ${e.message}`, "error");
+      throw e;
     }
 
-    function logLine(icon, msg){
-      const line = `[${nowIso()}] ${icon} ${msg}\n`;
-      elLog.textContent = line + elLog.textContent; // newest on top
-    }
+    setDebug("Connections OK: Overshoot key loaded + Airtable write works.");
+    log("Connections OK: Airtable write + Overshoot key loaded.");
+  }
 
-    function setStatus(msg){
-      elStatus.textContent = msg;
-    }
+  async function start(){
+    btnStart.disabled = true;
+    btnValidate.disabled = true;
 
-    // Live clock
-    setInterval(() => { elTime.textContent = fmtLocal(); }, 250);
-    elTime.textContent = fmtLocal();
+    try{
+      setPill(pillCamera, "warn", "Camera: starting…");
+      setPill(pillOvershoot, "warn", "Overshoot: starting…");
 
-    async function loadConfig(){
-      try{
-        const r = await fetch("/api/config", { method:"GET" });
-        if(!r.ok){
-          const t = await r.text();
-          throw new Error(`/api/config failed: ${r.status} ${t}`);
+      // Ensure we have a key
+      if(!overshootKey){
+        const cfg = await fetchJSON("/api/config");
+        overshootKey = cfg.overshootKey;
+        if(!overshootKey) throw new Error("No overshootKey returned from /api/config");
+        log("Loaded Overshoot key from /api/config.");
+        setPill(pillOvershoot, "ok", "Overshoot: key ok");
+      }
+
+      // Create RealtimeVision stream
+      // NOTE: model is REQUIRED by Overshoot
+      vision = new RealtimeVision({
+        apiKey: overshootKey,
+        source: { type: "camera", cameraFacing: "user" }, // use "environment" for rear camera (phones)
+        model: "Qwen/Qwen3-VL-30B-A3B-Instruct",
+        prompt: "Return ONLY an integer: the number of people visible in the frame.",
+        onResult: (result) => {
+          if (!result?.ok) return;
+
+          const raw = String(result.result ?? "").trim();
+          const num = parseInt(raw, 10);
+          if (!Number.isFinite(num)) return;
+
+          latestCount = num;
+          elCount.textContent = String(num);
+        },
+        onError: (err) => {
+          setPill(pillOvershoot, "bad", "Overshoot: error");
+          log(`Overshoot error: ${err?.message ?? err}`, "error");
         }
-        const j = await r.json();
-        overshootKey = j.overshootKey;
-        elConfig.textContent = JSON.stringify({ overshootKeyLoaded: !!overshootKey }, null, 2);
-        logLine("ℹ", "Loaded Overshoot key from /api/config.");
-        return true;
-      }catch(err){
-        elConfig.textContent = String(err);
-        logLine("✖", String(err));
-        setStatus(String(err));
-        return false;
-      }
-    }
-
-    async function postToAirtable(people_count, timestamp){
-      const payload = {
-        people_count,
-        timestamp: timestamp || nowIso()
-      };
-
-      const r = await fetch("/api/log", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(payload)
       });
 
-      const text = await r.text();
+      // Start (this triggers camera permissions prompt)
+      setDebug("Starting camera + Overshoot stream…");
+      log("Starting camera + Overshoot stream…");
 
-      if(!r.ok){
-        throw new Error(`/api/log failed: ${r.status} ${text}`);
-      }
+      await vision.start();
 
-      return text;
-    }
+      // If you want a visible preview element, Overshoot manages capture internally;
+      // we show the <video> only as a UI hint. Some SDKs don't expose the stream.
+      preview.style.display = "none";
 
-    async function validateConnections(){
-      setPill(validatePill, "warn", "Validate: running...");
-      setStatus("Validating connections...");
+      setPill(pillCamera, "ok", "Camera: ok");
+      setPill(pillOvershoot, "ok", "Overshoot: running");
+      btnStop.disabled = false;
 
-      const okConfig = await loadConfig();
-      if(!okConfig || !overshootKey){
-        setPill(validatePill, "bad", "Validate: failed (config)");
-        setPill(cameraPill, "warn", "Camera: idle");
-        setPill(airtablePill, "warn", "Airtable: idle");
-        return;
-      }
+      // Post to Airtable via /api/log if changed, every 5s
+      sendTimer = setInterval(async () => {
+        if (latestCount === null || latestCount === undefined) return;
+        if (latestCount === lastSent) return;
 
-      // Airtable write test (9999)
-      try{
-        const respText = await postToAirtable(9999, nowIso());
-        logLine("ℹ", "Logged to Airtable: people_count=9999");
-        setPill(airtablePill, "ok", "Airtable: ok");
-        setPill(validatePill, "ok", "Validate: OK (sent 9999)");
-        setStatus("Connections OK: Airtable write + Overshoot key loaded.");
-      }catch(err){
-        logLine("✖", String(err));
-        setPill(airtablePill, "bad", "Airtable: error");
-        setPill(validatePill, "bad", "Validate: failed (airtable)");
-        setStatus(String(err));
-      }
-    }
-
-    function parseOvershootResult(raw){
-      // Goal JSON:
-      // {"people_count": 7, "boxes":[{"x1":0.1,"y1":0.2,"x2":0.4,"y2":0.8}]}
-      // If model returns plain integer, we accept that too.
-      if(raw == null) return null;
-
-      const s = String(raw).trim();
-
-      // Try JSON first
-      if(s.startsWith("{")){
         try{
-          const j = JSON.parse(s);
-          if(typeof j.people_count === "number") return { count: j.people_count, json: j };
-          // Sometimes returns "count"
-          if(typeof j.count === "number") return { count: j.count, json: j };
-        }catch(_){}
-      }
-
-      // Fallback integer
-      const n = parseInt(s, 10);
-      if(Number.isFinite(n)) return { count: n, json: null };
-
-      return null;
-    }
-
-    async function startCamera(){
-      setStatus("Starting camera + Overshoot stream...");
-      setPill(cameraPill, "warn", "Camera: starting...");
-      startBtn.disabled = true;
-      validateBtn.disabled = true;
-
-      // Ensure config loaded
-      const okConfig = await loadConfig();
-      if(!okConfig || !overshootKey){
-        setPill(cameraPill, "bad", "Camera: error");
-        startBtn.disabled = false;
-        validateBtn.disabled = false;
-        return;
-      }
-
-      try{
-        const model = modelSelect.value;
-        const cameraFacing = facingSelect.value;
-
-        // JSON prompt for robust parsing (+ optional boxes)
-        const prompt = `
-Return ONLY valid JSON with this shape:
-{
-  "people_count": <integer>,
-  "boxes": [
-    {"x1":<0..1>,"y1":<0..1>,"x2":<0..1>,"y2":<0..1>}
-  ]
-}
-
-Rules:
-- people_count must be the number of visible people.
-- boxes should include one entry per visible person if possible.
-- coordinates are normalized to the image (0..1), x1< x2, y1< y2.
-- If you cannot reliably produce boxes, return an empty array for boxes.
-`.trim();
-
-        vision = new RealtimeVision({
-          apiKey: overshootKey,
-          model,
-          source: { type: "camera", cameraFacing },
-          prompt,
-          onResult: (result) => {
-            try{
-              if(!result || !result.ok) return;
-
-              const parsed = parseOvershootResult(result.result);
-              if(!parsed) return;
-
-              latestCount = parsed.count;
-              elCount.textContent = String(latestCount);
-            }catch(err){
-              logLine("✖", `onResult parse error: ${String(err)}`);
-            }
-          },
-          onError: (err) => {
-            logLine("✖", `Overshoot error: ${String(err)}`);
-            setStatus(`Overshoot error: ${String(err)}`);
-            setPill(cameraPill, "bad", "Camera: error");
-          }
-        });
-
-        await vision.start();
-
-        logLine("ℹ", "Camera stream started.");
-        setPill(cameraPill, "ok", "Camera: ok");
-        stopBtn.disabled = false;
-
-        // Send to Airtable every 5s if changed
-        if(sendTimer) clearInterval(sendTimer);
-        sendTimer = setInterval(async () => {
-          if(latestCount === lastSent) return;
-          try{
-            setPill(airtablePill, "warn", "Airtable: sending...");
-            await postToAirtable(latestCount, nowIso());
-            lastSent = latestCount;
-            setPill(airtablePill, "ok", "Airtable: ok");
-            logLine("ℹ", `Logged to Airtable: people_count=${latestCount}`);
-          }catch(err){
-            setPill(airtablePill, "bad", "Airtable: error");
-            logLine("✖", String(err));
-            setStatus(String(err));
-          }
-        }, 5000);
-
-        setStatus("Running. Count updates will log to Airtable when changed.");
-      }catch(err){
-        logLine("✖", String(err));
-        setStatus(String(err));
-        setPill(cameraPill, "bad", "Camera: error");
-        startBtn.disabled = false;
-        validateBtn.disabled = false;
-      }
-    }
-
-    async function stopCamera(){
-      try{
-        setStatus("Stopping...");
-        if(sendTimer) { clearInterval(sendTimer); sendTimer = null; }
-        if(vision){
-          await vision.stop();
-          vision = null;
+          setPill(pillAirtable, "warn", "Airtable: sending…");
+          await postJSON("/api/log", { people_count: latestCount, timestamp: nowISO() });
+          lastSent = latestCount;
+          setPill(pillAirtable, "ok", "Airtable: ok");
+          log(`Logged to Airtable: people_count=${latestCount}`);
+        }catch(e){
+          setPill(pillAirtable, "bad", "Airtable: error");
+          log(`Airtable send error: ${e.message}`, "error");
         }
-        setPill(cameraPill, "warn", "Camera: stopped");
-        stopBtn.disabled = true;
-        startBtn.disabled = false;
-        validateBtn.disabled = false;
-        setStatus("Stopped.");
-        logLine("ℹ", "Stopped stream.");
-      }catch(err){
-        logLine("✖", String(err));
-        setStatus(String(err));
-      }
+      }, 5000);
+
+      setDebug("Running. Move people in/out of view to see counts update.");
+    }catch(e){
+      setPill(pillCamera, "bad", "Camera: error");
+      setPill(pillOvershoot, "bad", "Overshoot: error");
+      log(`Start error: ${e.message}`, "error");
+      setDebug(e.message);
+      btnStart.disabled = false;
+      btnValidate.disabled = false;
     }
+  }
 
-    startBtn.addEventListener("click", startCamera);
-    stopBtn.addEventListener("click", stopCamera);
-    validateBtn.addEventListener("click", validateConnections);
+  async function stop(){
+    try{
+      if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
+      if (vision?.stop) await vision.stop();
+      vision = null;
 
-    // Initial
-    setPill(cameraPill, "warn", "Camera: idle");
-    setPill(airtablePill, "warn", "Airtable: idle");
-    setPill(validatePill, "warn", "Validate: idle");
-    logLine("ℹ", "Page loaded. Click “Start Camera” to begin.");
-    await loadConfig();
-  </script>
+      setPill(pillCamera, "warn", "Camera: stopped");
+      setPill(pillOvershoot, "warn", "Overshoot: stopped");
+      setDebug("Stopped.");
+      log("Stopped.");
+    }catch(e){
+      log(`Stop error: ${e.message}`, "error");
+    }finally{
+      btnStart.disabled = false;
+      btnValidate.disabled = false;
+      btnStop.disabled = true;
+    }
+  }
+
+  btnValidate.addEventListener("click", async () => {
+    btnValidate.disabled = true;
+    try{ await validateConnections(); }
+    finally{ btnValidate.disabled = false; }
+  });
+
+  btnStart.addEventListener("click", start);
+  btnStop.addEventListener("click", stop);
+
+  // Initial status
+  setPill(pillCamera, "warn", "Camera: idle");
+  setPill(pillOvershoot, "warn", "Overshoot: idle");
+  setPill(pillAirtable, "warn", "Airtable: idle");
+  elCount.textContent = "—";
+  log("Page loaded. Click 'Start Camera' to begin.");
+</script>
 </body>
 </html>
-
-
