@@ -3,403 +3,359 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Live People Counter (Tracking IDs)</title>
+  <title>Live People Counter (Face Boxes)</title>
 
   <style>
-    :root { color-scheme: dark; }
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0f17; color:#e8eefc; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
-    h1 { margin: 6px 0 6px; font-size: 40px; letter-spacing: -0.02em; }
-    .sub { opacity: .8; margin-bottom: 14px; }
-
-    .panel { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 16px; padding: 14px; }
-    .row { display:flex; gap: 12px; align-items:center; flex-wrap: wrap; }
-    .btn {
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.08);
-      color: #e8eefc;
-      padding: 10px 14px;
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 600;
+    :root{
+      --bg:#0b1220;
+      --card:#111a2e;
+      --muted:#9fb0d0;
+      --text:#eaf0ff;
+      --good:#2ecc71;
+      --bad:#ff5b5b;
+      --warn:#ffcc00;
+      --accent:#3b82f6;
+      --line:#223055;
     }
-    .btn.primary { background: #2b6cff; border-color: rgba(43,108,255,.6); }
-    .btn:disabled { opacity: .5; cursor: not-allowed; }
-
-    .badge { display:inline-flex; gap:8px; align-items:center; padding: 8px 10px; border-radius: 999px; font-size: 13px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: #aaa; }
-    .dot.ok { background: #31d07d; }
-    .dot.warn { background: #ffcc66; }
-    .dot.err { background: #ff5c5c; }
-
-    .stage { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.10); background: #000; }
-    video { width: 100%; height: auto; display:block; }
-    canvas { position:absolute; inset: 0; pointer-events:none; }
-
-    .stats { display:flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
-    .stat { flex: 1 1 220px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
-    .k { opacity:.75; font-size: 12px; letter-spacing: .12em; }
-    .v { font-size: 34px; font-weight: 800; margin-top: 6px; }
-
-    .log { margin-top: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.4; white-space: pre-wrap; max-height: 220px; overflow:auto; padding: 12px; border-radius: 14px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); }
-    .muted { opacity: .8; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 700px at 20% 0%, #142247 0%, var(--bg) 55%);
+      color:var(--text);
+    }
+    .wrap{ max-width:1100px; margin:32px auto; padding:0 16px; }
+    h1{ margin:0 0 6px 0; font-size:40px; letter-spacing:.2px; }
+    .sub{ color:var(--muted); margin:0 0 20px 0; }
+    .grid{ display:grid; grid-template-columns: 2fr 1fr; gap:16px; }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px; border-radius:999px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      color:var(--muted);
+      font-size:13px;
+    }
+    .pill.good{ color:#d9ffe8; border-color: rgba(46,204,113,.35); background: rgba(46,204,113,.12); }
+    .pill.bad{ color:#ffe2e2; border-color: rgba(255,91,91,.35); background: rgba(255,91,91,.12); }
+    .btn{
+      appearance:none; border:0; cursor:pointer;
+      padding:10px 14px; border-radius:12px;
+      background: rgba(255,255,255,.10);
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      font-weight:600;
+    }
+    .btn.primary{ background: var(--accent); border-color: rgba(59,130,246,.6); }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+    .kpi{ font-size:64px; font-weight:800; line-height:1; margin:10px 0 6px 0; }
+    .label{ font-size:13px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; }
+    .videoWrap{
+      position:relative; width:100%;
+      border-radius:16px; overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background: #000;
+    }
+    video{ width:100%; height:auto; display:block; }
+    canvas{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+    .logs{
+      margin-top:16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:13px;
+      white-space: pre-wrap;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px;
+      max-height:260px;
+      overflow:auto;
+    }
+    .small{ font-size:12px; color:var(--muted); }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+      .kpi{ font-size:56px; }
+    }
   </style>
+
+  <!-- MediaPipe Face Detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
 
 <body>
   <div class="wrap">
     <h1>Live People Counter</h1>
-    <div class="sub">COCO-SSD person detection + lightweight tracking IDs (no Overshoot yet). Designed to prove “unique people” tracking first.</div>
+    <p class="sub">Webcam → Face detection boxes → logs count to Airtable via <code>/api/log</code></p>
 
-    <div class="panel">
-      <div class="row">
-        <button id="btnStart" class="btn primary">Start Camera</button>
-        <button id="btnStop" class="btn" disabled>Stop Camera</button>
-        <span class="badge"><span id="camDot" class="dot"></span><span id="camStatus">Camera: idle</span></span>
-        <span class="badge"><span id="modelDot" class="dot"></span><span id="modelStatus">Model: loading…</span></span>
-        <span class="badge"><span class="dot ok"></span><span id="clock">--</span></span>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Camera Preview</div>
+        <div class="videoWrap" style="margin-top:10px;">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <button class="btn primary" id="btnStart">Start Camera</button>
+          <button class="btn" id="btnStop" disabled>Stop</button>
+          <button class="btn" id="btnValidate">Validate (send 9999)</button>
+
+          <span class="pill" id="pillCamera">Camera: idle</span>
+          <span class="pill" id="pillAirtable">Airtable: idle</span>
+        </div>
+
+        <div class="small" style="margin-top:10px;">
+          Sends an update every <b>5 seconds</b> when the count changes.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">People Count (faces)</div>
+        <div class="kpi" id="count">0</div>
+
+        <div style="height:10px;"></div>
+        <div class="label">Date & Time</div>
+        <div style="font-size:26px; font-weight:700; margin-top:8px;" id="dt">—</div>
+        <div class="small">Local browser time.</div>
       </div>
     </div>
 
-    <div style="height:12px"></div>
-
-    <div class="stage">
-      <video id="video" playsinline muted></video>
-      <canvas id="overlay"></canvas>
-    </div>
-
-    <div class="stats">
-      <div class="stat">
-        <div class="k">PEOPLE DETECTED (CURRENT FRAME)</div>
-        <div class="v" id="peopleNow">0</div>
-      </div>
-      <div class="stat">
-        <div class="k">TRACKS (ACTIVE IDs)</div>
-        <div class="v" id="tracksNow">0</div>
-      </div>
-      <div class="stat">
-        <div class="k">TOTAL UNIQUE (SESSION)</div>
-        <div class="v" id="uniqueTotal">0</div>
-      </div>
-    </div>
-
-    <div id="log" class="log"></div>
-    <div class="muted" style="margin-top:8px">
-      Tip: for better boxes, avoid strong backlight (don’t sit in front of a bright window).
+    <div class="card" style="margin-top:16px;">
+      <div class="label">Errors / Logs</div>
+      <div class="logs" id="logs"></div>
     </div>
   </div>
 
-  <!-- TensorFlow.js + COCO-SSD -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+(() => {
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("overlay");
+  const ctx = canvas.getContext("2d");
 
-  <script>
-    // ========= UI helpers =========
-    const $ = (id) => document.getElementById(id);
-    const logEl = $("log");
-    function log(msg, level="info") {
-      const ts = new Date().toISOString();
-      const icon = level === "err" ? "✖" : level === "warn" ? "!" : "i";
-      logEl.textContent = `[${ts}] ${icon} ${msg}\n` + logEl.textContent;
+  const elCount = document.getElementById("count");
+  const elDT = document.getElementById("dt");
+  const logsEl = document.getElementById("logs");
+
+  const btnStart = document.getElementById("btnStart");
+  const btnStop = document.getElementById("btnStop");
+  const btnValidate = document.getElementById("btnValidate");
+
+  const pillCamera = document.getElementById("pillCamera");
+  const pillAirtable = document.getElementById("pillAirtable");
+
+  let camera = null;
+  let latestCount = 0;
+  let lastSent = -1;
+  let running = false;
+
+  function log(msg, level="info"){
+    const ts = new Date().toISOString();
+    const icon = level === "error" ? "✖" : level === "warn" ? "⚠" : "i";
+    logsEl.textContent = `[${ts}] ${icon} ${msg}\n` + logsEl.textContent;
+  }
+
+  function setPill(pill, text, state){
+    pill.textContent = text;
+    pill.classList.remove("good","bad");
+    if(state === "good") pill.classList.add("good");
+    if(state === "bad") pill.classList.add("bad");
+  }
+
+  function fitCanvasToVideo(){
+    // Make canvas pixel size match the displayed video size
+    const rect = video.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function drawBoxes(detections){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if(!vw || !vh) return;
+
+    // canvas is styled to match video element; use element rect for mapping
+    const rect = video.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#22c55e";
+    ctx.font = "14px ui-monospace, Menlo, Consolas, monospace";
+    ctx.fillStyle = "#22c55e";
+
+    for (let i=0; i<detections.length; i++){
+      // MediaPipe gives relative bbox in [0..1]
+      const b = detections[i].boundingBox;
+      const x = b.xCenter - b.width/2;
+      const y = b.yCenter - b.height/2;
+
+      const px = x * cw;
+      const py = y * ch;
+      const pw = b.width * cw;
+      const ph = b.height * ch;
+
+      ctx.strokeRect(px, py, pw, ph);
+      ctx.fillText("Face", px + 4, Math.max(14, py - 6));
     }
-    function setDot(dotEl, state) {
-      dotEl.classList.remove("ok","warn","err");
-      if (state) dotEl.classList.add(state);
-    }
+  }
 
-    // ========= Clock =========
-    function tickClock() {
-      const d = new Date();
-      $("clock").textContent = d.toLocaleString();
-    }
-    setInterval(tickClock, 500);
-    tickClock();
+  async function sendToAirtable(count){
+    try{
+      setPill(pillAirtable, "Airtable: sending...", "warn");
+      const r = await fetch("/api/log", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          people_count: count,
+          timestamp: new Date().toISOString()
+        })
+      });
 
-    // ========= Video + Canvas =========
-    const video = $("video");
-    const canvas = $("overlay");
-    const ctx = canvas.getContext("2d");
-
-    function resizeCanvasToVideo() {
-      // Match the canvas pixel size to the displayed video size
-      const rect = video.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.round(rect.width * dpr));
-      canvas.height = Math.max(1, Math.round(rect.height * dpr));
-      canvas.style.width = rect.width + "px";
-      canvas.style.height = rect.height + "px";
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    window.addEventListener("resize", () => { if (!video.paused) resizeCanvasToVideo(); });
-
-    // ========= Model =========
-    let model = null;
-
-    async function loadModel() {
-      try {
-        $("modelStatus").textContent = "Model: loading…";
-        setDot($("modelDot"), "warn");
-        // warmup
-        await tf.ready();
-        model = await cocoSsd.load();
-        $("modelStatus").textContent = "Model: ready";
-        setDot($("modelDot"), "ok");
-        log("COCO-SSD model loaded.");
-      } catch (e) {
-        $("modelStatus").textContent = "Model: error";
-        setDot($("modelDot"), "err");
-        log("Failed to load COCO-SSD: " + (e?.message || e), "err");
+      const text = await r.text();
+      if(!r.ok){
+        setPill(pillAirtable, `Airtable: ${r.status}`, "bad");
+        log(`Airtable POST failed (${r.status}): ${text}`, "error");
+        return false;
       }
+      setPill(pillAirtable, "Airtable: ok", "good");
+      log(`Logged to Airtable: people_count=${count}`);
+      return true;
+    } catch(e){
+      setPill(pillAirtable, "Airtable: error", "bad");
+      log(`Airtable exception: ${e?.message || e}`, "error");
+      return false;
     }
-    loadModel();
+  }
 
-    // ========= Tracking (lightweight) =========
-    // Track = stable ID + smoothed bbox + lastSeen timestamp
-    let nextTrackId = 1;
-    const tracks = new Map(); // id -> track
-    const seenIds = new Set(); // for total unique in session
+  // Live clock
+  setInterval(() => {
+    elDT.textContent = new Date().toLocaleString();
+  }, 250);
 
-    // parameters you can tune
-    const IOU_MATCH_THRESHOLD = 0.25;
-    const MAX_MISSES = 10; // frames to keep a track without a match
-    const SMOOTHING = 0.6; // higher = smoother boxes
+  // MediaPipe Face Detection setup
+  const faceDetection = new FaceDetection.FaceDetection({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+  });
+  faceDetection.setOptions({
+    model: "short",          // "short" is faster, good for real-time
+    minDetectionConfidence: 0.5
+  });
 
-    function iou(a, b) {
-      // a, b: {x,y,w,h} in same coordinate system
-      const x1 = Math.max(a.x, b.x);
-      const y1 = Math.max(a.y, b.y);
-      const x2 = Math.min(a.x + a.w, b.x + b.w);
-      const y2 = Math.min(a.y + a.h, b.y + b.h);
-      const interW = Math.max(0, x2 - x1);
-      const interH = Math.max(0, y2 - y1);
-      const inter = interW * interH;
-      const union = a.w * a.h + b.w * b.h - inter;
-      return union <= 0 ? 0 : inter / union;
-    }
+  faceDetection.onResults((results) => {
+    if(!running) return;
 
-    function smoothBox(oldB, newB) {
-      if (!oldB) return newB;
-      return {
-        x: oldB.x * SMOOTHING + newB.x * (1 - SMOOTHING),
-        y: oldB.y * SMOOTHING + newB.y * (1 - SMOOTHING),
-        w: oldB.w * SMOOTHING + newB.w * (1 - SMOOTHING),
-        h: oldB.h * SMOOTHING + newB.h * (1 - SMOOTHING),
-      };
-    }
+    const detections = results?.detections || [];
+    latestCount = detections.length;
+    elCount.textContent = String(latestCount);
 
-    function updateTracks(detections) {
-      // detections: array of boxes [{x,y,w,h,score}]
-      // 1) mark all as unmatched
-      const detUsed = new Array(detections.length).fill(false);
+    drawBoxes(detections);
+  });
 
-      // 2) try to match existing tracks by best IoU
-      for (const [id, tr] of tracks.entries()) {
-        let bestIdx = -1;
-        let bestIou = 0;
+  async function startCamera(){
+    try{
+      setPill(pillCamera, "Camera: starting...", "warn");
+      log("Starting camera...");
 
-        for (let i = 0; i < detections.length; i++) {
-          if (detUsed[i]) continue;
-          const val = iou(tr.bbox, detections[i]);
-          if (val > bestIou) { bestIou = val; bestIdx = i; }
-        }
+      // Stop any previous camera
+      await stopCamera();
 
-        if (bestIdx >= 0 && bestIou >= IOU_MATCH_THRESHOLD) {
-          // matched
-          const det = detections[bestIdx];
-          detUsed[bestIdx] = true;
-          tr.bbox = smoothBox(tr.bbox, det);
-          tr.misses = 0;
-          tr.lastScore = det.score;
-          tracks.set(id, tr);
-        } else {
-          // not matched
-          tr.misses += 1;
-          tracks.set(id, tr);
-        }
-      }
+      // MediaPipe Camera helper (handles getUserMedia + frame loop)
+      camera = new Camera(video, {
+        onFrame: async () => {
+          if(!running) return;
+          // keep canvas synced
+          if(video.readyState >= 2) fitCanvasToVideo();
+          await faceDetection.send({ image: video });
+        },
+        width: 1280,
+        height: 720
+      });
 
-      // 3) create new tracks for unmatched detections
-      for (let i = 0; i < detections.length; i++) {
-        if (detUsed[i]) continue;
-        const id = nextTrackId++;
-        tracks.set(id, {
-          id,
-          bbox: detections[i],
-          misses: 0,
-          lastScore: detections[i].score
-        });
-        seenIds.add(id);
-      }
+      running = true;
+      await camera.start();
 
-      // 4) prune old tracks
-      for (const [id, tr] of tracks.entries()) {
-        if (tr.misses > MAX_MISSES) {
-          tracks.delete(id);
-        }
-      }
-    }
+      setPill(pillCamera, "Camera: running", "good");
+      btnStart.disabled = true;
+      btnStop.disabled = false;
 
-    // ========= Rendering =========
-    function draw(tracksMap) {
-      // clear
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // draw each track
-      for (const tr of tracksMap.values()) {
-        const b = tr.bbox;
-
-        // box
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "#22e08a";
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
-
-        // label
-        const label = `ID ${tr.id}`;
-        ctx.font = "14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-        const pad = 6;
-        const tw = ctx.measureText(label).width;
-        const lh = 18;
-
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(b.x, Math.max(0, b.y - lh), tw + pad * 2, lh);
-
-        ctx.fillStyle = "#e8eefc";
-        ctx.fillText(label, b.x + pad, Math.max(14, b.y - 5));
-      }
-    }
-
-    // ========= Main loop =========
-    let stream = null;
-    let running = false;
-    let rafId = null;
-
-    async function startCamera() {
-      if (!model) {
-        log("Model not ready yet. Wait for 'Model: ready'.", "warn");
-        return;
-      }
-      if (running) return;
-
-      try {
-        $("camStatus").textContent = "Camera: requesting…";
-        setDot($("camDot"), "warn");
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        });
-
-        video.srcObject = stream;
-        await video.play();
-
-        resizeCanvasToVideo();
-        $("camStatus").textContent = "Camera: live";
-        setDot($("camDot"), "ok");
-
-        running = true;
-        $("btnStart").disabled = true;
-        $("btnStop").disabled = false;
-
-        log("Camera started. Tracking IDs enabled.");
-
-        loop();
-      } catch (e) {
-        $("camStatus").textContent = "Camera: error";
-        setDot($("camDot"), "err");
-        log("Camera error: " + (e?.message || e), "err");
-      }
-    }
-
-    function stopCamera() {
+      log("Camera started. Face detection running.");
+    } catch(e){
       running = false;
-      $("btnStart").disabled = false;
-      $("btnStop").disabled = true;
+      setPill(pillCamera, "Camera: error", "bad");
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      log(`Camera error: ${e?.message || e}`, "error");
+    }
+  }
 
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = null;
+  async function stopCamera(){
+    try{
+      running = false;
 
-      if (stream) {
+      if(camera){
+        await camera.stop();
+        camera = null;
+      }
+
+      // Hard-stop the tracks if they exist
+      const stream = video.srcObject;
+      if(stream && stream.getTracks){
         stream.getTracks().forEach(t => t.stop());
-        stream = null;
       }
       video.srcObject = null;
 
-      tracks.clear();
-      nextTrackId = 1;
-      seenIds.clear();
+      ctx.clearRect(0,0,canvas.width,canvas.height);
 
-      $("peopleNow").textContent = "0";
-      $("tracksNow").textContent = "0";
-      $("uniqueTotal").textContent = "0";
+      setPill(pillCamera, "Camera: stopped", "warn");
+      btnStart.disabled = false;
+      btnStop.disabled = true;
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      $("camStatus").textContent = "Camera: stopped";
-      setDot($("camDot"), null);
-
-      log("Camera stopped. Session reset.");
+      log("Camera stopped.");
+    } catch(e){
+      log(`Stop camera exception: ${e?.message || e}`, "warn");
     }
+  }
 
-    async function loop() {
-      if (!running) return;
-
-      // Some browsers need a small delay until video has metadata
-      if (video.readyState < 2) {
-        rafId = requestAnimationFrame(loop);
-        return;
-      }
-
-      // keep overlay aligned
-      resizeCanvasToVideo();
-
-      try {
-        // COCO-SSD expects the actual video element
-        const preds = await model.detect(video);
-
-        // filter to "person" only
-        const people = preds
-          .filter(p => p.class === "person" && p.score >= 0.40)
-          .map(p => ({
-            x: p.bbox[0],
-            y: p.bbox[1],
-            w: p.bbox[2],
-            h: p.bbox[3],
-            score: p.score
-          }));
-
-        updateTracks(people);
-        draw(tracks);
-
-        $("peopleNow").textContent = String(people.length);
-        $("tracksNow").textContent = String(tracks.size);
-        $("uniqueTotal").textContent = String(seenIds.size);
-
-      } catch (e) {
-        log("Detection loop error: " + (e?.message || e), "err");
-      }
-
-      rafId = requestAnimationFrame(loop);
+  // Log every 5s if changed
+  setInterval(() => {
+    if(!running) return;
+    if(latestCount !== lastSent){
+      sendToAirtable(latestCount);
+      lastSent = latestCount;
     }
+  }, 5000);
 
-    // ========= Buttons =========
-    $("btnStart").addEventListener("click", startCamera);
-    $("btnStop").addEventListener("click", stopCamera);
+  // Validate button (send 9999)
+  btnValidate.addEventListener("click", async () => {
+    log("Validating Airtable connection by sending 9999...");
+    await sendToAirtable(9999);
+  });
 
-    // ========= Capability checks =========
-    (function init() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        $("camStatus").textContent = "Camera: unsupported";
-        setDot($("camDot"), "err");
-        log("This browser does not support getUserMedia(). Use Chrome/Edge.", "err");
-      } else {
-        $("camStatus").textContent = "Camera: idle";
-        log("Page loaded. Click 'Start Camera' to begin.");
-      }
-    })();
-  </script>
+  btnStart.addEventListener("click", startCamera);
+  btnStop.addEventListener("click", stopCamera);
+
+  // Resize handling
+  window.addEventListener("resize", () => {
+    if(video.readyState >= 2) fitCanvasToVideo();
+  });
+
+  // Initial
+  elDT.textContent = new Date().toLocaleString();
+  setPill(pillCamera, "Camera: idle", "warn");
+  setPill(pillAirtable, "Airtable: idle", "warn");
+  log("Page loaded. Click 'Start Camera' to begin.");
+})();
+</script>
 </body>
 </html>
