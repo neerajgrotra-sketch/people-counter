@@ -1,283 +1,338 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Live People Counter</title>
-
   <style>
-    :root { --bg:#0b0f17; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
-    body { margin:0; font-family: Arial, sans-serif; background:var(--bg); color:var(--text); }
-    .wrap { max-width: 900px; margin: 0 auto; padding: 28px; }
-    .title { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
-    .sub { color: var(--muted); margin-bottom: 18px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .card { background: var(--card); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; }
-    .big { font-size: 86px; font-weight: 800; line-height: 1; margin: 10px 0 6px; }
-    .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-    .row { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
-    button {
-      background: #2563eb; color: white; border: none; padding: 10px 14px; border-radius: 10px;
-      font-weight: 700; cursor:pointer;
+    :root{
+      --bg:#0b1220; --card:#101a2e; --muted:#9fb0c8; --text:#e8f0ff;
+      --ok:#2ecc71; --warn:#f1c40f; --err:#e74c3c; --btn:#2d6cdf;
     }
-    button:disabled { opacity: .55; cursor:not-allowed; }
-    .pill { padding: 6px 10px; border-radius: 999px; font-size: 12px; border: 1px solid rgba(255,255,255,0.12); color: var(--muted); }
-    .pill.ok { color: var(--ok); border-color: rgba(34,197,94,.35); }
-    .pill.warn { color: var(--warn); border-color: rgba(245,158,11,.35); }
-    .pill.err { color: var(--err); border-color: rgba(239,68,68,.35); }
-    pre {
-      white-space: pre-wrap; word-break: break-word;
-      background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08);
-      padding: 12px; border-radius: 12px; margin: 0;
-      color: #d1d5db; font-size: 12px; line-height: 1.35;
-      max-height: 220px; overflow:auto;
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 700px at 10% -10%, #182a52 0%, rgba(24,42,82,0) 60%),
+                  radial-gradient(900px 600px at 90% 0%, #1a3b6b 0%, rgba(26,59,107,0) 55%),
+                  var(--bg);
+      color:var(--text);
+      padding: 28px;
     }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .fine { color: var(--muted); font-size: 12px; margin-top: 6px; }
-    .span2 { grid-column: 1 / span 2; }
+    h1{ margin:0 0 8px; font-size: 40px; letter-spacing: -0.02em;}
+    .sub{ color:var(--muted); margin-bottom:18px; }
+    .grid{ display:grid; grid-template-columns: 1.2fr 1fr; gap:16px; align-items:start; }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+    }
+    .label{ color:var(--muted); font-size: 13px; letter-spacing: .12em; text-transform:uppercase; }
+    .big{
+      font-size: 86px; font-weight: 750; margin: 10px 0 12px;
+      letter-spacing: -0.03em;
+    }
+    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    button{
+      border:0; padding:12px 16px; border-radius: 12px; cursor:pointer;
+      font-weight: 650; font-size: 15px;
+    }
+    .primary{ background: var(--btn); color:white; }
+    .secondary{ background: rgba(255,255,255,0.08); color: var(--text); }
+    .danger{ background: rgba(231,76,60,0.15); color: #ffb3ad; border: 1px solid rgba(231,76,60,0.35); }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px; border-radius: 999px; font-size: 13px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+    }
+    .pill.ok{ color:#bff5d6; border-color: rgba(46,204,113,0.4); background: rgba(46,204,113,0.12); }
+    .pill.warn{ color:#fff0b3; border-color: rgba(241,196,15,0.4); background: rgba(241,196,15,0.12); }
+    .pill.err{ color:#ffc2bd; border-color: rgba(231,76,60,0.45); background: rgba(231,76,60,0.14); }
+    .muted{ color: var(--muted); }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .log{
+      height: 220px; overflow:auto; background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 12px;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
+    .rightCol .bigTime{ font-size: 42px; font-weight: 750; margin: 10px 0 0; }
+    .small{ font-size: 13px; }
+    a{ color:#a8c7ff; }
+    @media (max-width: 960px){
+      .grid{ grid-template-columns: 1fr; }
+      .big{ font-size: 72px; }
+      .rightCol .bigTime{ font-size: 36px; }
+    }
   </style>
 </head>
-
 <body>
-  <div class="wrap">
-    <div class="title">Live People Counter</div>
-    <div class="sub">Uses webcam + Overshoot for people counting and logs counts to Airtable via <span class="mono">/api/log</span>.</div>
+  <h1>Live People Counter</h1>
+  <div class="sub">Uses webcam + Overshoot for people counting and logs counts to Airtable via <span class="mono">/api/log</span>.</div>
 
-    <div class="grid">
-      <div class="card">
-        <div class="label">People Count</div>
-        <div id="count" class="big">—</div>
+  <div class="grid">
+    <div class="card">
+      <div class="label">People Count</div>
+      <div id="count" class="big">—</div>
 
-        <div class="row" style="margin-top:10px;">
-          <button id="startBtn">Start Camera</button>
-          <button id="stopBtn" disabled>Stop</button>
+      <div class="row" style="margin-bottom:10px;">
+        <button id="startBtn" class="primary">Start Camera</button>
+        <button id="stopBtn" class="secondary" disabled>Stop</button>
 
-          <span id="statusPill" class="pill warn">Not started</span>
-          <span class="pill">Airtable log: <span id="airtablePill" class="mono">idle</span></span>
-        </div>
-
-        <div class="fine">
-          Sends an update every <b>5 seconds</b> when the count changes.
-        </div>
+        <span id="camPill" class="pill warn">Camera: idle</span>
+        <span id="airPill" class="pill">Airtable: idle</span>
       </div>
 
-      <div class="card">
-        <div class="label">Date & Time</div>
-        <div style="font-size: 28px; font-weight: 700; margin-top: 10px;" id="dateTime">—</div>
-        <div class="fine">Local browser time.</div>
-
-        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.08); margin:14px 0;">
-
-        <div class="label">Debug</div>
-        <div class="fine mono" id="debugLine">Ready.</div>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="testBtn" class="secondary">Validate Connections (send 9999)</button>
+        <span id="testPill" class="pill">Not tested</span>
       </div>
 
-      <div class="card span2">
-        <div class="label">Errors / Logs</div>
-        <pre id="log" class="mono"></pre>
+      <div class="muted small">
+        Sends an update every <b>5 seconds</b> when the count changes.
       </div>
+    </div>
+
+    <div class="card rightCol">
+      <div class="label">Date &amp; Time</div>
+      <div id="clock" class="bigTime">—</div>
+      <div class="muted small">Local browser time.</div>
+
+      <div style="height:14px;"></div>
+
+      <div class="label">Debug</div>
+      <div id="debug" class="mono small muted">Ready.</div>
     </div>
   </div>
 
+  <div class="card" style="margin-top:16px;">
+    <div class="label">Errors / Logs</div>
+    <div id="log" class="log mono"></div>
+  </div>
+
   <script type="module">
-    // ---------- UI helpers ----------
+    // ---- Overshoot import (ESM) ----
+    // If you see "does not provide an export named RealtimeVision", tell me your console error and I'll swap this line.
+    import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot@latest/dist/index.mjs";
+
+    // ---- UI Elements ----
+    const elCount = document.getElementById("count");
+    const elClock = document.getElementById("clock");
+    const elDebug = document.getElementById("debug");
+    const elLog   = document.getElementById("log");
+
     const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const countEl = document.getElementById("count");
-    const logEl = document.getElementById("log");
-    const statusPill = document.getElementById("statusPill");
-    const airtablePill = document.getElementById("airtablePill");
-    const dateTimeEl = document.getElementById("dateTime");
-    const debugLine = document.getElementById("debugLine");
+    const stopBtn  = document.getElementById("stopBtn");
+    const testBtn  = document.getElementById("testBtn");
 
-    function nowISO() { return new Date().toISOString(); }
-    function appendLog(msg, level = "info") {
-      const prefix = level === "error" ? "❌" : level === "warn" ? "⚠️" : "ℹ️";
-      const line = `[${nowISO()}] ${prefix} ${msg}\n`;
-      logEl.textContent = line + logEl.textContent;
+    const camPill  = document.getElementById("camPill");
+    const airPill  = document.getElementById("airPill");
+    const testPill = document.getElementById("testPill");
+
+    function nowISO(){ return new Date().toISOString(); }
+
+    function setPill(pill, state, text){
+      pill.className = "pill " + (state || "");
+      pill.textContent = text;
     }
 
-    function setStatus(state, text) {
-      statusPill.classList.remove("ok", "warn", "err");
-      if (state === "ok") statusPill.classList.add("ok");
-      if (state === "warn") statusPill.classList.add("warn");
-      if (state === "err") statusPill.classList.add("err");
-      statusPill.textContent = text;
+    function appendLog(msg, level="info"){
+      const ts = new Date().toISOString();
+      const prefix = level === "error" ? "✖" : (level === "warn" ? "!" : "i");
+      elLog.textContent += `[${ts}] ${prefix} ${msg}\n`;
+      elLog.scrollTop = elLog.scrollHeight;
     }
 
-    function setAirtableStatus(text) {
-      airtablePill.textContent = text;
+    function setDebug(msg){
+      elDebug.textContent = msg;
     }
 
-    // Live date/time tick
-    setInterval(() => {
+    // ---- Live Clock ----
+    function tickClock(){
       const d = new Date();
-      dateTimeEl.textContent = d.toLocaleString();
-    }, 250);
+      elClock.textContent = d.toLocaleString();
+    }
+    tickClock();
+    setInterval(tickClock, 1000);
 
-    // ---------- State ----------
+    // ---- State ----
     let vision = null;
     let latestCount = null;
     let lastSent = null;
     let sendTimer = null;
-    let overshootKey = null;
 
-    // ---------- Airtable logger (server-side) ----------
-    async function sendToAirtable(count) {
-      try {
-        setAirtableStatus("sending…");
+    // ---- Config ----
+    const MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct"; // required by Overshoot
+    const PROMPT = "Return ONLY an integer: the number of people visible in the frame.";
+
+    // ---- API Calls ----
+    async function getOvershootKey(){
+      const r = await fetch("/api/config");
+      if (!r.ok) throw new Error(`/api/config failed: ${r.status}`);
+      const data = await r.json();
+      if (!data.overshootKey) throw new Error("Missing overshootKey from /api/config");
+      return data.overshootKey;
+    }
+
+    async function postToAirtable(count){
+      try{
+        setPill(airPill, "warn", "Airtable: sending…");
         const r = await fetch("/api/log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            people_count: count,
-            timestamp: new Date().toISOString()
-          })
+          body: JSON.stringify({ people_count: count, timestamp: nowISO() })
         });
-
         const text = await r.text();
 
-        if (!r.ok) {
-          setAirtableStatus(`error (${r.status})`);
-          appendLog(`Airtable log failed: HTTP ${r.status} — ${text}`, "error");
-          return;
+        if (!r.ok){
+          setPill(airPill, "err", `Airtable: ${r.status}`);
+          appendLog(`Airtable /api/log error ${r.status}: ${text}`, "error");
+          return false;
         }
 
-        setAirtableStatus("ok");
-        debugLine.textContent = `Last Airtable write: count=${count}`;
-      } catch (e) {
-        setAirtableStatus("network error");
-        appendLog(`Airtable log exception: ${e?.message || e}`, "error");
+        setPill(airPill, "ok", "Airtable: ok");
+        appendLog(`Logged to Airtable: people_count=${count}`, "info");
+        return true;
+      } catch (e){
+        setPill(airPill, "err", "Airtable: error");
+        appendLog(`Airtable fetch failed: ${e.message}`, "error");
+        return false;
       }
     }
 
-    function startSendLoop() {
-      if (sendTimer) clearInterval(sendTimer);
-      sendTimer = setInterval(() => {
-        if (latestCount === null || latestCount === undefined) return;
-        if (latestCount !== lastSent) {
-          sendToAirtable(latestCount);
-          lastSent = latestCount;
-        }
-      }, 5000);
+    async function validateConnections(){
+      testPill.textContent = "Testing…";
+      testPill.className = "pill warn";
+      appendLog("Validating connections…", "info");
+
+      // 1) Airtable test
+      const airtableOk = await postToAirtable(9999);
+
+      // 2) Overshoot “connectivity” test (key fetch + object creation)
+      let overshootOk = false;
+      try{
+        const key = await getOvershootKey();
+        overshootOk = Boolean(key);
+      } catch (e){
+        appendLog(`Overshoot config check failed: ${e.message}`, "error");
+        overshootOk = false;
+      }
+
+      if (airtableOk && overshootOk){
+        testPill.textContent = "OK (sent 9999)";
+        testPill.className = "pill ok";
+        appendLog("Connections OK: Airtable write + Overshoot key loaded.", "info");
+      } else {
+        testPill.textContent = "FAILED";
+        testPill.className = "pill err";
+        appendLog(`Connections FAILED (Airtable=${airtableOk}, OvershootKey=${overshootOk})`, "error");
+      }
     }
 
-    function stopSendLoop() {
-      if (sendTimer) clearInterval(sendTimer);
-      sendTimer = null;
-    }
+    // ---- Camera / Vision ----
+    async function startCamera(){
+      try{
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
 
-    // ---------- Camera start/stop ----------
-    async function startCamera() {
-      startBtn.disabled = true;
-      setStatus("warn", "Starting…");
-      appendLog("Starting camera + Overshoot stream…");
+        setPill(camPill, "warn", "Camera: starting…");
+        setDebug("Loading Overshoot key…");
 
-      try {
-        // 1) Pull Overshoot key from server
-        const cfgResp = await fetch("/api/config");
-        if (!cfgResp.ok) throw new Error(`/api/config failed: HTTP ${cfgResp.status}`);
-        const cfg = await cfgResp.json();
+        const apiKey = await getOvershootKey();
+        appendLog("Loaded Overshoot key from /api/config.", "info");
 
-        overshootKey = cfg.overshootKey;
-        if (!overshootKey) throw new Error("Missing overshootKey in /api/config response");
-        appendLog("Loaded Overshoot key from /api/config.");
+        setDebug("Starting camera + Overshoot stream…");
 
-        // 2) Import browser-safe Overshoot SDK (ESM)
-        // If the named export doesn't exist, this will throw immediately.
-        const mod = await import("https://cdn.jsdelivr.net/npm/overshoot/+esm");
-
-        // Prefer named export, but allow default export fallback.
-        const RealtimeVision = mod.RealtimeVision || mod.default;
-        if (!RealtimeVision) {
-          appendLog("Overshoot module loaded but RealtimeVision export not found. Check console for module structure.", "error");
-          console.log("Overshoot module exports:", mod);
-          throw new Error("Overshoot SDK export not found (RealtimeVision).");
-        }
-
-        // 3) Build vision client
         vision = new RealtimeVision({
-          apiKey: overshootKey,
-          source: { type: "camera" }, // uses laptop webcam
-          prompt: "Return ONLY an integer: the number of people visible in the frame.",
+          apiKey,
+          model: MODEL,
+          source: { type: "camera" },
+          prompt: PROMPT,
           onResult: (result) => {
-            try {
-              if (!result?.ok) return;
+            try{
+              if (!result || !result.ok) return;
 
+              // Result expected: integer as text
               const raw = String(result.result ?? "").trim();
               const num = parseInt(raw, 10);
-
-              if (!Number.isFinite(num)) {
-                appendLog(`Overshoot returned non-integer: "${raw}"`, "warn");
-                return;
-              }
+              if (!Number.isFinite(num)) return;
 
               latestCount = num;
-              countEl.textContent = String(num);
-              setStatus("ok", "Streaming");
-            } catch (e) {
-              appendLog(`onResult handler error: ${e?.message || e}`, "error");
+              elCount.textContent = String(num);
+            } catch (e){
+              appendLog(`onResult parse error: ${e.message}`, "error");
             }
+          },
+          onError: (err) => {
+            // If SDK provides this callback
+            const msg = (err && (err.message || String(err))) || "Unknown Overshoot error";
+            setPill(camPill, "err", "Camera: error");
+            setDebug(msg);
+            appendLog(msg, "error");
           }
         });
 
-        // 4) Start the stream (will request webcam permission)
         await vision.start();
 
-        stopBtn.disabled = false;
-        setStatus("ok", "Streaming");
-        appendLog("Stream started. If you don't see counts, ensure your prompt/model are valid in Overshoot.");
-        startSendLoop();
+        setPill(camPill, "ok", "Camera: running");
+        setDebug("Stream running.");
+        appendLog("Camera stream started.", "info");
 
-      } catch (e) {
-        setStatus("err", "Error");
+        // Send to Airtable every 5s only if count changed
+        if (sendTimer) clearInterval(sendTimer);
+        sendTimer = setInterval(() => {
+          if (latestCount == null) return;
+          if (latestCount !== lastSent) {
+            postToAirtable(latestCount);
+            lastSent = latestCount;
+          }
+        }, 5000);
+
+      } catch (e){
         startBtn.disabled = false;
         stopBtn.disabled = true;
-        stopSendLoop();
 
-        const msg = e?.message || String(e);
-        appendLog(msg, "error");
-        debugLine.textContent = `Error: ${msg}`;
+        setPill(camPill, "err", "Camera: error");
+        setDebug(e.message || String(e));
+        appendLog(e.message || String(e), "error");
       }
     }
 
-    async function stopCamera() {
-      stopBtn.disabled = true;
-      setStatus("warn", "Stopping…");
-      appendLog("Stopping stream…");
+    async function stopCamera(){
+      try{
+        stopBtn.disabled = true;
+        startBtn.disabled = false;
 
-      try {
-        stopSendLoop();
-
-        // Overshoot SDK may or may not implement stop(). If it does, call it safely.
-        if (vision && typeof vision.stop === "function") {
-          await vision.stop();
+        if (sendTimer){
+          clearInterval(sendTimer);
+          sendTimer = null;
         }
 
+        if (vision && typeof vision.stop === "function"){
+          await vision.stop();
+        }
         vision = null;
-        latestCount = null;
-        lastSent = null;
 
-        countEl.textContent = "—";
-        setStatus("warn", "Stopped");
-        startBtn.disabled = false;
-        appendLog("Stopped.");
-      } catch (e) {
-        const msg = e?.message || String(e);
-        appendLog(`Stop error: ${msg}`, "error");
-        setStatus("err", "Stop error");
-        startBtn.disabled = false;
+        setPill(camPill, "warn", "Camera: stopped");
+        setDebug("Stopped.");
+        appendLog("Camera stream stopped.", "info");
+      } catch (e){
+        setPill(camPill, "err", "Camera: error");
+        setDebug(e.message || String(e));
+        appendLog(`Stop error: ${e.message || e}`, "error");
       }
     }
 
-    // Button wiring
+    // ---- Wire buttons ----
     startBtn.addEventListener("click", startCamera);
     stopBtn.addEventListener("click", stopCamera);
+    testBtn.addEventListener("click", validateConnections);
 
-    // Initial UI state
-    setStatus("warn", "Not started");
-    setAirtableStatus("idle");
-    appendLog("Page loaded. Click 'Start Camera' to begin.");
+    // ---- Initial message ----
+    appendLog("Page loaded. Click 'Start Camera' to begin.", "info");
   </script>
 </body>
 </html>
