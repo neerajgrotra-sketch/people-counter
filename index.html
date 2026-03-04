@@ -1,214 +1,405 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Audience Engagement Detector</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live People Counter (Tracking IDs)</title>
 
-<style>
-body{
-    font-family: Arial;
-    text-align:center;
-    background:#111;
-    color:white;
-}
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0f17; color:#e8eefc; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
+    h1 { margin: 6px 0 6px; font-size: 40px; letter-spacing: -0.02em; }
+    .sub { opacity: .8; margin-bottom: 14px; }
 
-#videoContainer{
-    position:relative;
-    width:900px;
-    margin:auto;
-}
+    .panel { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 16px; padding: 14px; }
+    .row { display:flex; gap: 12px; align-items:center; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: #e8eefc;
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn.primary { background: #2b6cff; border-color: rgba(43,108,255,.6); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-video{
-    width:900px;
-    border-radius:10px;
-}
+    .badge { display:inline-flex; gap:8px; align-items:center; padding: 8px 10px; border-radius: 999px; font-size: 13px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #aaa; }
+    .dot.ok { background: #31d07d; }
+    .dot.warn { background: #ffcc66; }
+    .dot.err { background: #ff5c5c; }
 
-canvas{
-    position:absolute;
-    top:0;
-    left:0;
-}
+    .stage { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.10); background: #000; }
+    video { width: 100%; height: auto; display:block; }
+    canvas { position:absolute; inset: 0; pointer-events:none; }
 
-#controls{
-    margin-top:20px;
-}
+    .stats { display:flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+    .stat { flex: 1 1 220px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
+    .k { opacity:.75; font-size: 12px; letter-spacing: .12em; }
+    .v { font-size: 34px; font-weight: 800; margin-top: 6px; }
 
-button{
-    padding:10px 20px;
-    font-size:16px;
-    margin:5px;
-}
-
-#stats{
-    margin-top:15px;
-    font-size:20px;
-}
-
-#error{
-    color:#ff6b6b;
-    margin-top:10px;
-}
-
-#clock{
-    margin-top:10px;
-    font-size:18px;
-}
-</style>
-
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-
+    .log { margin-top: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.4; white-space: pre-wrap; max-height: 220px; overflow:auto; padding: 12px; border-radius: 14px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); }
+    .muted { opacity: .8; }
+  </style>
 </head>
 
 <body>
+  <div class="wrap">
+    <h1>Live People Counter</h1>
+    <div class="sub">COCO-SSD person detection + lightweight tracking IDs (no Overshoot yet). Designed to prove “unique people” tracking first.</div>
 
-<h1>Audience Engagement Monitor</h1>
+    <div class="panel">
+      <div class="row">
+        <button id="btnStart" class="btn primary">Start Camera</button>
+        <button id="btnStop" class="btn" disabled>Stop Camera</button>
+        <span class="badge"><span id="camDot" class="dot"></span><span id="camStatus">Camera: idle</span></span>
+        <span class="badge"><span id="modelDot" class="dot"></span><span id="modelStatus">Model: loading…</span></span>
+        <span class="badge"><span class="dot ok"></span><span id="clock">--</span></span>
+      </div>
+    </div>
 
-<div id="clock"></div>
+    <div style="height:12px"></div>
 
-<div id="videoContainer">
+    <div class="stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+    </div>
 
-<video id="video" autoplay muted playsinline></video>
-<canvas id="overlay"></canvas>
+    <div class="stats">
+      <div class="stat">
+        <div class="k">PEOPLE DETECTED (CURRENT FRAME)</div>
+        <div class="v" id="peopleNow">0</div>
+      </div>
+      <div class="stat">
+        <div class="k">TRACKS (ACTIVE IDs)</div>
+        <div class="v" id="tracksNow">0</div>
+      </div>
+      <div class="stat">
+        <div class="k">TOTAL UNIQUE (SESSION)</div>
+        <div class="v" id="uniqueTotal">0</div>
+      </div>
+    </div>
 
-</div>
+    <div id="log" class="log"></div>
+    <div class="muted" style="margin-top:8px">
+      Tip: for better boxes, avoid strong backlight (don’t sit in front of a bright window).
+    </div>
+  </div>
 
-<div id="controls">
+  <!-- TensorFlow.js + COCO-SSD -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
-<button onclick="startCamera()">Start Camera</button>
-<button onclick="stopCamera()">Stop Camera</button>
-
-</div>
-
-<div id="stats">
-
-People Detected: <span id="peopleCount">0</span>
-
-</div>
-
-<div id="error"></div>
-
-<script>
-
-let video = document.getElementById("video");
-let canvas = document.getElementById("overlay");
-let ctx = canvas.getContext("2d");
-
-let detector;
-let stream;
-let running = false;
-
-async function loadModel(){
-
-    try{
-
-        detector = await cocoSsd.load();
-        console.log("Model loaded");
-
-    }catch(err){
-
-        showError("Failed to load detection model");
-
+  <script>
+    // ========= UI helpers =========
+    const $ = (id) => document.getElementById(id);
+    const logEl = $("log");
+    function log(msg, level="info") {
+      const ts = new Date().toISOString();
+      const icon = level === "err" ? "✖" : level === "warn" ? "!" : "i";
+      logEl.textContent = `[${ts}] ${icon} ${msg}\n` + logEl.textContent;
+    }
+    function setDot(dotEl, state) {
+      dotEl.classList.remove("ok","warn","err");
+      if (state) dotEl.classList.add(state);
     }
 
-}
+    // ========= Clock =========
+    function tickClock() {
+      const d = new Date();
+      $("clock").textContent = d.toLocaleString();
+    }
+    setInterval(tickClock, 500);
+    tickClock();
 
-function showError(msg){
+    // ========= Video + Canvas =========
+    const video = $("video");
+    const canvas = $("overlay");
+    const ctx = canvas.getContext("2d");
 
-    document.getElementById("error").innerText = msg;
+    function resizeCanvasToVideo() {
+      // Match the canvas pixel size to the displayed video size
+      const rect = video.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      canvas.style.width = rect.width + "px";
+      canvas.style.height = rect.height + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", () => { if (!video.paused) resizeCanvasToVideo(); });
 
-}
+    // ========= Model =========
+    let model = null;
 
-function updateClock(){
+    async function loadModel() {
+      try {
+        $("modelStatus").textContent = "Model: loading…";
+        setDot($("modelDot"), "warn");
+        // warmup
+        await tf.ready();
+        model = await cocoSsd.load();
+        $("modelStatus").textContent = "Model: ready";
+        setDot($("modelDot"), "ok");
+        log("COCO-SSD model loaded.");
+      } catch (e) {
+        $("modelStatus").textContent = "Model: error";
+        setDot($("modelDot"), "err");
+        log("Failed to load COCO-SSD: " + (e?.message || e), "err");
+      }
+    }
+    loadModel();
 
-    const now = new Date();
-    document.getElementById("clock").innerText =
-        now.toLocaleDateString() + " " + now.toLocaleTimeString();
+    // ========= Tracking (lightweight) =========
+    // Track = stable ID + smoothed bbox + lastSeen timestamp
+    let nextTrackId = 1;
+    const tracks = new Map(); // id -> track
+    const seenIds = new Set(); // for total unique in session
 
-}
+    // parameters you can tune
+    const IOU_MATCH_THRESHOLD = 0.25;
+    const MAX_MISSES = 10; // frames to keep a track without a match
+    const SMOOTHING = 0.6; // higher = smoother boxes
 
-setInterval(updateClock,1000);
+    function iou(a, b) {
+      // a, b: {x,y,w,h} in same coordinate system
+      const x1 = Math.max(a.x, b.x);
+      const y1 = Math.max(a.y, b.y);
+      const x2 = Math.min(a.x + a.w, b.x + b.w);
+      const y2 = Math.min(a.y + a.h, b.y + b.h);
+      const interW = Math.max(0, x2 - x1);
+      const interH = Math.max(0, y2 - y1);
+      const inter = interW * interH;
+      const union = a.w * a.h + b.w * b.h - inter;
+      return union <= 0 ? 0 : inter / union;
+    }
 
-async function startCamera(){
+    function smoothBox(oldB, newB) {
+      if (!oldB) return newB;
+      return {
+        x: oldB.x * SMOOTHING + newB.x * (1 - SMOOTHING),
+        y: oldB.y * SMOOTHING + newB.y * (1 - SMOOTHING),
+        w: oldB.w * SMOOTHING + newB.w * (1 - SMOOTHING),
+        h: oldB.h * SMOOTHING + newB.h * (1 - SMOOTHING),
+      };
+    }
 
-    try{
+    function updateTracks(detections) {
+      // detections: array of boxes [{x,y,w,h,score}]
+      // 1) mark all as unmatched
+      const detUsed = new Array(detections.length).fill(false);
+
+      // 2) try to match existing tracks by best IoU
+      for (const [id, tr] of tracks.entries()) {
+        let bestIdx = -1;
+        let bestIou = 0;
+
+        for (let i = 0; i < detections.length; i++) {
+          if (detUsed[i]) continue;
+          const val = iou(tr.bbox, detections[i]);
+          if (val > bestIou) { bestIou = val; bestIdx = i; }
+        }
+
+        if (bestIdx >= 0 && bestIou >= IOU_MATCH_THRESHOLD) {
+          // matched
+          const det = detections[bestIdx];
+          detUsed[bestIdx] = true;
+          tr.bbox = smoothBox(tr.bbox, det);
+          tr.misses = 0;
+          tr.lastScore = det.score;
+          tracks.set(id, tr);
+        } else {
+          // not matched
+          tr.misses += 1;
+          tracks.set(id, tr);
+        }
+      }
+
+      // 3) create new tracks for unmatched detections
+      for (let i = 0; i < detections.length; i++) {
+        if (detUsed[i]) continue;
+        const id = nextTrackId++;
+        tracks.set(id, {
+          id,
+          bbox: detections[i],
+          misses: 0,
+          lastScore: detections[i].score
+        });
+        seenIds.add(id);
+      }
+
+      // 4) prune old tracks
+      for (const [id, tr] of tracks.entries()) {
+        if (tr.misses > MAX_MISSES) {
+          tracks.delete(id);
+        }
+      }
+    }
+
+    // ========= Rendering =========
+    function draw(tracksMap) {
+      // clear
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // draw each track
+      for (const tr of tracksMap.values()) {
+        const b = tr.bbox;
+
+        // box
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#22e08a";
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+        // label
+        const label = `ID ${tr.id}`;
+        ctx.font = "14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+        const pad = 6;
+        const tw = ctx.measureText(label).width;
+        const lh = 18;
+
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(b.x, Math.max(0, b.y - lh), tw + pad * 2, lh);
+
+        ctx.fillStyle = "#e8eefc";
+        ctx.fillText(label, b.x + pad, Math.max(14, b.y - 5));
+      }
+    }
+
+    // ========= Main loop =========
+    let stream = null;
+    let running = false;
+    let rafId = null;
+
+    async function startCamera() {
+      if (!model) {
+        log("Model not ready yet. Wait for 'Model: ready'.", "warn");
+        return;
+      }
+      if (running) return;
+
+      try {
+        $("camStatus").textContent = "Camera: requesting…";
+        setDot($("camDot"), "warn");
 
         stream = await navigator.mediaDevices.getUserMedia({
-            video:true
+          video: {
+            facingMode: "user",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
         });
 
         video.srcObject = stream;
-
         await video.play();
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        resizeCanvasToVideo();
+        $("camStatus").textContent = "Camera: live";
+        setDot($("camDot"), "ok");
 
         running = true;
+        $("btnStart").disabled = true;
+        $("btnStop").disabled = false;
 
-        detectLoop();
+        log("Camera started. Tracking IDs enabled.");
 
-    }catch(err){
-
-        showError("Camera error: " + err.message);
-
+        loop();
+      } catch (e) {
+        $("camStatus").textContent = "Camera: error";
+        setDot($("camDot"), "err");
+        log("Camera error: " + (e?.message || e), "err");
+      }
     }
 
-}
+    function stopCamera() {
+      running = false;
+      $("btnStart").disabled = false;
+      $("btnStop").disabled = true;
 
-function stopCamera(){
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
 
-    running = false;
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      video.srcObject = null;
 
-    if(stream){
+      tracks.clear();
+      nextTrackId = 1;
+      seenIds.clear();
 
-        stream.getTracks().forEach(track=>track.stop());
+      $("peopleNow").textContent = "0";
+      $("tracksNow").textContent = "0";
+      $("uniqueTotal").textContent = "0";
 
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      $("camStatus").textContent = "Camera: stopped";
+      setDot($("camDot"), null);
+
+      log("Camera stopped. Session reset.");
     }
 
-}
+    async function loop() {
+      if (!running) return;
 
-async function detectLoop(){
+      // Some browsers need a small delay until video has metadata
+      if (video.readyState < 2) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
 
-    if(!running) return;
+      // keep overlay aligned
+      resizeCanvasToVideo();
 
-    try{
+      try {
+        // COCO-SSD expects the actual video element
+        const preds = await model.detect(video);
 
-        const predictions = await detector.detect(video);
+        // filter to "person" only
+        const people = preds
+          .filter(p => p.class === "person" && p.score >= 0.40)
+          .map(p => ({
+            x: p.bbox[0],
+            y: p.bbox[1],
+            w: p.bbox[2],
+            h: p.bbox[3],
+            score: p.score
+          }));
 
-        ctx.clearRect(0,0,canvas.width,canvas.height);
+        updateTracks(people);
+        draw(tracks);
 
-        let people = predictions.filter(p=>p.class==="person");
+        $("peopleNow").textContent = String(people.length);
+        $("tracksNow").textContent = String(tracks.size);
+        $("uniqueTotal").textContent = String(seenIds.size);
 
-        document.getElementById("peopleCount").innerText = people.length;
+      } catch (e) {
+        log("Detection loop error: " + (e?.message || e), "err");
+      }
 
-        people.forEach(person=>{
-
-            const [x,y,width,height] = person.bbox;
-
-            ctx.strokeStyle = "#00ff88";
-            ctx.lineWidth = 2;
-
-            ctx.strokeRect(x,y,width,height);
-
-            ctx.fillStyle = "#00ff88";
-            ctx.fillText("Person",x,y>10?y-5:10);
-
-        });
-
-    }catch(err){
-
-        showError("Detection error: " + err.message);
-
+      rafId = requestAnimationFrame(loop);
     }
 
-    setTimeout(detectLoop,2000);
+    // ========= Buttons =========
+    $("btnStart").addEventListener("click", startCamera);
+    $("btnStop").addEventListener("click", stopCamera);
 
-}
-
-loadModel();
-
-</script>
-
+    // ========= Capability checks =========
+    (function init() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        $("camStatus").textContent = "Camera: unsupported";
+        setDot($("camDot"), "err");
+        log("This browser does not support getUserMedia(). Use Chrome/Edge.", "err");
+      } else {
+        $("camStatus").textContent = "Camera: idle";
+        log("Page loaded. Click 'Start Camera' to begin.");
+      }
+    })();
+  </script>
 </body>
 </html>
