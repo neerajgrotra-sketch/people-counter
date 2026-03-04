@@ -247,9 +247,12 @@
         setDebug("Starting camera + Overshoot stream…");
 
         vision = new RealtimeVision({
-          apiKey,
-          model: MODEL,
-          source: { type: "camera" },
+  apiKey,
+  model: MODEL,
+  source: {
+    type: "camera",
+    cameraFacing: "environment"
+  },
           prompt: PROMPT,
           onResult: (result) => {
             try{
@@ -336,3 +339,4 @@
   </script>
 </body>
 </html>
+
