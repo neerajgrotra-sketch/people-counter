@@ -1,319 +1,214 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Live People Counter</title>
-  <style>
-    :root{
-      --bg:#0b1220; --card:#111b2e; --muted:#93a4c7; --text:#eaf0ff;
-      --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444; --btn:#2563eb;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-    body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text); }
-    .wrap{ max-width: 1100px; margin: 28px auto; padding: 0 16px; }
-    h1{ margin:0 0 6px; font-size: 44px; letter-spacing:-0.02em; }
-    .sub{ color:var(--muted); margin:0 0 18px; }
-    .grid{ display:grid; grid-template-columns: 1.2fr 0.8fr; gap:16px; }
-    .card{ background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); border:1px solid rgba(255,255,255,0.08);
-      border-radius:18px; padding:18px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
-    .label{ font-size:12px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
-    #count{ font-size: 78px; font-weight: 800; margin: 8px 0 14px; }
-    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-    button{
-      appearance:none; border:0; border-radius:12px; padding:12px 16px; font-weight:700; cursor:pointer;
-      background: var(--btn); color:white;
-    }
-    button.secondary{ background: rgba(255,255,255,0.10); color: var(--text); }
-    button:disabled{ opacity:0.55; cursor:not-allowed; }
-    .pill{
-      border-radius:999px; padding:10px 12px; font-weight:700; font-size:14px;
-      border:1px solid rgba(255,255,255,0.10);
-      background: rgba(0,0,0,0.25);
-    }
-    .pill.ok{ border-color: rgba(22,163,74,0.5); color:#bbf7d0; }
-    .pill.bad{ border-color: rgba(239,68,68,0.5); color:#fecaca; }
-    .pill.warn{ border-color: rgba(245,158,11,0.5); color:#fde68a; }
-    .mono{ font-family: var(--mono); }
-    #time{ font-size: 40px; font-weight: 800; margin-top: 6px; }
-    .tiny{ color:var(--muted); margin-top:6px; }
-    #logs{
-      height: 260px; overflow:auto; background: rgba(0,0,0,0.35); border-radius: 14px;
-      border:1px solid rgba(255,255,255,0.08); padding: 12px;
-      font-family: var(--mono); font-size: 13px; line-height: 1.45;
-      white-space: pre-wrap;
-    }
-    video{ width:100%; max-height: 240px; background:black; border-radius: 14px; border:1px solid rgba(255,255,255,0.08); display:none; }
-    .foot{ color:var(--muted); margin-top:10px; font-size: 13px; }
-  </style>
+<meta charset="UTF-8">
+<title>Audience Engagement Detector</title>
+
+<style>
+body{
+    font-family: Arial;
+    text-align:center;
+    background:#111;
+    color:white;
+}
+
+#videoContainer{
+    position:relative;
+    width:900px;
+    margin:auto;
+}
+
+video{
+    width:900px;
+    border-radius:10px;
+}
+
+canvas{
+    position:absolute;
+    top:0;
+    left:0;
+}
+
+#controls{
+    margin-top:20px;
+}
+
+button{
+    padding:10px 20px;
+    font-size:16px;
+    margin:5px;
+}
+
+#stats{
+    margin-top:15px;
+    font-size:20px;
+}
+
+#error{
+    color:#ff6b6b;
+    margin-top:10px;
+}
+
+#clock{
+    margin-top:10px;
+    font-size:18px;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
 </head>
 
 <body>
-  <div class="wrap">
-    <h1>Live People Counter</h1>
-    <p class="sub">Uses webcam + Overshoot for people counting and logs counts to Airtable via <span class="mono">/api/log</span>.</p>
 
-    <div class="grid">
-      <div class="card">
-        <div class="label">People Count</div>
-        <div id="count">—</div>
+<h1>Audience Engagement Monitor</h1>
 
-        <div class="row" style="margin-bottom:10px;">
-          <button id="btnStart">Start Camera</button>
-          <button id="btnStop" class="secondary" disabled>Stop</button>
-          <button id="btnValidate" class="secondary">Validate Connections (send 9999)</button>
+<div id="clock"></div>
 
-          <span id="pillCamera" class="pill warn">Camera: idle</span>
-          <span id="pillOvershoot" class="pill warn">Overshoot: idle</span>
-          <span id="pillAirtable" class="pill warn">Airtable: idle</span>
-        </div>
+<div id="videoContainer">
 
-        <video id="preview" autoplay playsinline muted></video>
+<video id="video" autoplay muted playsinline></video>
+<canvas id="overlay"></canvas>
 
-        <div class="foot">
-          Sends an update every <b>5 seconds</b> when the count changes.
-        </div>
-      </div>
+</div>
 
-      <div class="card">
-        <div class="label">Date &amp; Time</div>
-        <div id="time">—</div>
-        <div class="tiny">Local browser time.</div>
+<div id="controls">
 
-        <div style="height:12px;"></div>
-        <div class="label">Debug</div>
-        <div id="debug" class="mono" style="color:var(--muted);">
-          Page loaded. Click <b>Start Camera</b> to begin.
-        </div>
-      </div>
-    </div>
+<button onclick="startCamera()">Start Camera</button>
+<button onclick="stopCamera()">Stop Camera</button>
 
-    <div style="height:16px;"></div>
+</div>
 
-    <div class="card">
-      <div class="label">Errors / Logs</div>
-      <div id="logs"></div>
-    </div>
-  </div>
+<div id="stats">
 
-<script type="module">
-  // ✅ IMPORTANT: Use the ESM build. This avoids:
-  // - "does not provide an export named RealtimeVision"
-  // - "exports is not defined"
-  import { RealtimeVision } from "https://cdn.jsdelivr.net/npm/overshoot@2.0.0-alpha.6/dist/index.mjs";
+People Detected: <span id="peopleCount">0</span>
 
-  const elCount = document.getElementById("count");
-  const elTime = document.getElementById("time");
-  const elLogs = document.getElementById("logs");
-  const elDebug = document.getElementById("debug");
-  const btnStart = document.getElementById("btnStart");
-  const btnStop = document.getElementById("btnStop");
-  const btnValidate = document.getElementById("btnValidate");
-  const pillCamera = document.getElementById("pillCamera");
-  const pillOvershoot = document.getElementById("pillOvershoot");
-  const pillAirtable = document.getElementById("pillAirtable");
-  const preview = document.getElementById("preview");
+</div>
 
-  let vision = null;
-  let latestCount = null;
-  let lastSent = null;
-  let sendTimer = null;
-  let overshootKey = null;
+<div id="error"></div>
 
-  function nowISO(){ return new Date().toISOString(); }
+<script>
 
-  function log(msg, level="info"){
-    const stamp = nowISO();
-    const icon = level === "error" ? "✖" : level === "warn" ? "!" : "i";
-    elLogs.textContent = `[${stamp}] ${icon} ${msg}\n` + elLogs.textContent;
-  }
+let video = document.getElementById("video");
+let canvas = document.getElementById("overlay");
+let ctx = canvas.getContext("2d");
 
-  function setPill(el, state, text){
-    el.classList.remove("ok","warn","bad");
-    el.classList.add(state);
-    el.textContent = text;
-  }
+let detector;
+let stream;
+let running = false;
 
-  function setDebug(text){ elDebug.textContent = text; }
-
-  // Live clock
-  setInterval(() => {
-    elTime.textContent = new Date().toLocaleString();
-  }, 250);
-  elTime.textContent = new Date().toLocaleString();
-
-  async function fetchJSON(url){
-    const r = await fetch(url, { cache: "no-store" });
-    const t = await r.text();
-    let j = null;
-    try { j = JSON.parse(t); } catch {}
-    if(!r.ok){
-      throw new Error(`${url} -> ${r.status} ${r.statusText}: ${t.slice(0,200)}`);
-    }
-    return j ?? {};
-  }
-
-  async function postJSON(url, body){
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const t = await r.text();
-    if(!r.ok){
-      throw new Error(`${url} -> ${r.status} ${r.statusText}: ${t.slice(0,200)}`);
-    }
-    return t;
-  }
-
-  async function validateConnections(){
-    setDebug("Validating connections…");
-    log("Validating connections…");
-
-    // 1) Overshoot config
-    try{
-      const cfg = await fetchJSON("/api/config");
-      overshootKey = cfg.overshootKey;
-      if(!overshootKey) throw new Error("No overshootKey returned from /api/config");
-      setPill(pillOvershoot, "ok", "Overshoot: key ok");
-      log("Loaded Overshoot key from /api/config.");
-    }catch(e){
-      setPill(pillOvershoot, "bad", "Overshoot: error");
-      log(`Overshoot config error: ${e.message}`, "error");
-      throw e;
-    }
-
-    // 2) Airtable write test via serverless /api/log
-    try{
-      await postJSON("/api/log", { people_count: 9999, timestamp: nowISO() });
-      setPill(pillAirtable, "ok", "Airtable: ok (sent 9999)");
-      log("Logged to Airtable: people_count=9999");
-    }catch(e){
-      setPill(pillAirtable, "bad", "Airtable: error");
-      log(`Airtable log error: ${e.message}`, "error");
-      throw e;
-    }
-
-    setDebug("Connections OK: Overshoot key loaded + Airtable write works.");
-    log("Connections OK: Airtable write + Overshoot key loaded.");
-  }
-
-  async function start(){
-    btnStart.disabled = true;
-    btnValidate.disabled = true;
+async function loadModel(){
 
     try{
-      setPill(pillCamera, "warn", "Camera: starting…");
-      setPill(pillOvershoot, "warn", "Overshoot: starting…");
 
-      // Ensure we have a key
-      if(!overshootKey){
-        const cfg = await fetchJSON("/api/config");
-        overshootKey = cfg.overshootKey;
-        if(!overshootKey) throw new Error("No overshootKey returned from /api/config");
-        log("Loaded Overshoot key from /api/config.");
-        setPill(pillOvershoot, "ok", "Overshoot: key ok");
-      }
+        detector = await cocoSsd.load();
+        console.log("Model loaded");
 
-      // Create RealtimeVision stream
-      // NOTE: model is REQUIRED by Overshoot
-      vision = new RealtimeVision({
-        apiKey: overshootKey,
-        source: { type: "camera", cameraFacing: "user" }, // use "environment" for rear camera (phones)
-        model: "Qwen/Qwen3-VL-30B-A3B-Instruct",
-        prompt: "Return ONLY an integer: the number of people visible in the frame.",
-        onResult: (result) => {
-          if (!result?.ok) return;
+    }catch(err){
 
-          const raw = String(result.result ?? "").trim();
-          const num = parseInt(raw, 10);
-          if (!Number.isFinite(num)) return;
+        showError("Failed to load detection model");
 
-          latestCount = num;
-          elCount.textContent = String(num);
-        },
-        onError: (err) => {
-          setPill(pillOvershoot, "bad", "Overshoot: error");
-          log(`Overshoot error: ${err?.message ?? err}`, "error");
-        }
-      });
-
-      // Start (this triggers camera permissions prompt)
-      setDebug("Starting camera + Overshoot stream…");
-      log("Starting camera + Overshoot stream…");
-
-      await vision.start();
-
-      // If you want a visible preview element, Overshoot manages capture internally;
-      // we show the <video> only as a UI hint. Some SDKs don't expose the stream.
-      preview.style.display = "none";
-
-      setPill(pillCamera, "ok", "Camera: ok");
-      setPill(pillOvershoot, "ok", "Overshoot: running");
-      btnStop.disabled = false;
-
-      // Post to Airtable via /api/log if changed, every 5s
-      sendTimer = setInterval(async () => {
-        if (latestCount === null || latestCount === undefined) return;
-        if (latestCount === lastSent) return;
-
-        try{
-          setPill(pillAirtable, "warn", "Airtable: sending…");
-          await postJSON("/api/log", { people_count: latestCount, timestamp: nowISO() });
-          lastSent = latestCount;
-          setPill(pillAirtable, "ok", "Airtable: ok");
-          log(`Logged to Airtable: people_count=${latestCount}`);
-        }catch(e){
-          setPill(pillAirtable, "bad", "Airtable: error");
-          log(`Airtable send error: ${e.message}`, "error");
-        }
-      }, 5000);
-
-      setDebug("Running. Move people in/out of view to see counts update.");
-    }catch(e){
-      setPill(pillCamera, "bad", "Camera: error");
-      setPill(pillOvershoot, "bad", "Overshoot: error");
-      log(`Start error: ${e.message}`, "error");
-      setDebug(e.message);
-      btnStart.disabled = false;
-      btnValidate.disabled = false;
     }
-  }
 
-  async function stop(){
+}
+
+function showError(msg){
+
+    document.getElementById("error").innerText = msg;
+
+}
+
+function updateClock(){
+
+    const now = new Date();
+    document.getElementById("clock").innerText =
+        now.toLocaleDateString() + " " + now.toLocaleTimeString();
+
+}
+
+setInterval(updateClock,1000);
+
+async function startCamera(){
+
     try{
-      if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
-      if (vision?.stop) await vision.stop();
-      vision = null;
 
-      setPill(pillCamera, "warn", "Camera: stopped");
-      setPill(pillOvershoot, "warn", "Overshoot: stopped");
-      setDebug("Stopped.");
-      log("Stopped.");
-    }catch(e){
-      log(`Stop error: ${e.message}`, "error");
-    }finally{
-      btnStart.disabled = false;
-      btnValidate.disabled = false;
-      btnStop.disabled = true;
+        stream = await navigator.mediaDevices.getUserMedia({
+            video:true
+        });
+
+        video.srcObject = stream;
+
+        await video.play();
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        running = true;
+
+        detectLoop();
+
+    }catch(err){
+
+        showError("Camera error: " + err.message);
+
     }
-  }
 
-  btnValidate.addEventListener("click", async () => {
-    btnValidate.disabled = true;
-    try{ await validateConnections(); }
-    finally{ btnValidate.disabled = false; }
-  });
+}
 
-  btnStart.addEventListener("click", start);
-  btnStop.addEventListener("click", stop);
+function stopCamera(){
 
-  // Initial status
-  setPill(pillCamera, "warn", "Camera: idle");
-  setPill(pillOvershoot, "warn", "Overshoot: idle");
-  setPill(pillAirtable, "warn", "Airtable: idle");
-  elCount.textContent = "—";
-  log("Page loaded. Click 'Start Camera' to begin.");
+    running = false;
+
+    if(stream){
+
+        stream.getTracks().forEach(track=>track.stop());
+
+    }
+
+}
+
+async function detectLoop(){
+
+    if(!running) return;
+
+    try{
+
+        const predictions = await detector.detect(video);
+
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+
+        let people = predictions.filter(p=>p.class==="person");
+
+        document.getElementById("peopleCount").innerText = people.length;
+
+        people.forEach(person=>{
+
+            const [x,y,width,height] = person.bbox;
+
+            ctx.strokeStyle = "#00ff88";
+            ctx.lineWidth = 2;
+
+            ctx.strokeRect(x,y,width,height);
+
+            ctx.fillStyle = "#00ff88";
+            ctx.fillText("Person",x,y>10?y-5:10);
+
+        });
+
+    }catch(err){
+
+        showError("Detection error: " + err.message);
+
+    }
+
+    setTimeout(detectLoop,2000);
+
+}
+
+loadModel();
+
 </script>
+
 </body>
 </html>
