@@ -3,35 +3,57 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Live People Counter</title>
+  <title>Perform for a Smile — Audience Tracker</title>
   <style>
-    :root { --bg:#0b1020; --card:#0f1730; --text:#e8eefc; --muted:#a9b4d0; --ok:#20c997; --bad:#ff6b6b; --btn:#2f6bff; --warn:#ffd43b; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, Arial; background: radial-gradient(1200px 700px at 20% 0%, #13204a 0%, var(--bg) 55%); color:var(--text); }
-    .wrap { max-width: 1100px; margin: 28px auto; padding: 0 16px; }
-    h1 { margin: 0 0 6px; font-size: 40px; letter-spacing: .2px; }
+    :root {
+      --bg:#0b1020; --card:#0f1730; --text:#e8eefc; --muted:#a9b4d0;
+      --ok:#20c997; --bad:#ff6b6b; --btn:#2f6bff; --warn:#ffd43b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; font-family: ui-sans-serif, system-ui, Arial;
+      background: radial-gradient(1200px 700px at 20% 0%, #13204a 0%, var(--bg) 55%);
+      color:var(--text);
+    }
+    .wrap { max-width: 1240px; margin: 28px auto; padding: 0 16px; }
+    h1 { margin: 0 0 6px; font-size: 38px; }
     .sub { margin: 0 0 18px; color: var(--muted); }
     .grid { display:grid; grid-template-columns: 2fr 1fr; gap: 16px; }
-    .card { background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border: 1px solid rgba(255,255,255,.10); border-radius: 18px; padding: 16px; box-shadow: 0 16px 45px rgba(0,0,0,.35); }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 18px; padding: 16px; box-shadow: 0 16px 45px rgba(0,0,0,.35);
+    }
     .videoWrap { position:relative; border-radius: 14px; overflow:hidden; background:#000; }
     video { width:100%; height:auto; display:block; }
     canvas { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
     .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top: 12px; }
-    button { border:0; border-radius: 12px; padding: 10px 14px; font-weight: 700; cursor:pointer; color:white; background: var(--btn); }
+    button {
+      border:0; border-radius: 12px; padding: 10px 14px; font-weight: 700;
+      cursor:pointer; color:white; background: var(--btn);
+    }
     button.secondary { background: rgba(255,255,255,.10); }
     button:disabled { opacity: .55; cursor:not-allowed; }
-    .pill { border-radius: 999px; padding: 8px 12px; font-weight: 700; font-size: 13px; border:1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); }
+    .pill {
+      border-radius: 999px; padding: 8px 12px; font-weight: 700; font-size: 13px;
+      border:1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25);
+    }
     .pill.ok { color: var(--ok); border-color: rgba(32,201,151,.45); }
     .pill.bad { color: var(--bad); border-color: rgba(255,107,107,.5); }
     .pill.warn { color: var(--warn); border-color: rgba(255,212,59,.55); }
-    .big { font-size: 54px; font-weight: 900; margin: 8px 0 0; }
+    .big { font-size: 52px; font-weight: 900; margin: 8px 0 0; }
     .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
-    .logs { margin-top: 14px; background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.10); border-radius: 14px; padding: 12px; max-height: 240px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.35; white-space: pre-wrap; }
+    .logs {
+      margin-top: 14px; background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px; padding: 12px; max-height: 260px; overflow:auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px; line-height: 1.35; white-space: pre-wrap;
+    }
     .kpi { display:grid; gap:10px; }
     .kpiBox { padding: 14px; border-radius: 14px; background: rgba(0,0,0,.20); border:1px solid rgba(255,255,255,.10); }
     .kpiVal { font-size: 40px; font-weight: 900; margin-top: 6px; }
     .small { color: var(--muted); font-size: 13px; }
     .footer { margin-top: 10px; color: var(--muted); font-size: 13px; }
-
     .settings { margin-top: 10px; display:grid; gap:10px; }
     .settingRow { display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; }
     input[type="range"]{ width: 100%; }
@@ -41,8 +63,8 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Live People Counter</h1>
-    <p class="sub">Webcam + COCO-SSD person detection + <b>stable tracking IDs</b> (confirmed tracks) + logs to Airtable via <code>/api/log</code>.</p>
+    <h1>Perform for a Smile — Audience Tracker</h1>
+    <p class="sub">Webcam + COCO-SSD + duplicate suppression + velocity-aware stable tracking + Airtable logging via <code>/api/log</code>.</p>
 
     <div class="grid">
       <div class="card">
@@ -61,8 +83,8 @@
         </div>
 
         <div class="footer">
-          Detection runs every <b><span id="detMsLabel">250</span>ms</b>. People count uses <b>confirmed tracks</b> (reduces churn in wide shots).
-          Tentative tracks are drawn in <span style="color:var(--warn);font-weight:800;">yellow</span>.
+          Detection interval <b><span id="detMsLabel">175</span>ms</b>. Duplicate detections are removed with NMS. Tentative tracks are
+          <span style="color:var(--warn);font-weight:800;">yellow</span>. Airtable logs the <b>median-smoothed confirmed count</b>.
         </div>
 
         <div class="logs" id="logs"></div>
@@ -77,9 +99,15 @@
           </div>
 
           <div class="kpiBox">
-            <div class="label">People Detected (confirmed)</div>
+            <div class="label">People Detected (stable)</div>
             <div class="kpiVal" id="peopleCount">0</div>
-            <div class="small">Counts only confirmed tracks (stable).</div>
+            <div class="small">Median-smoothed confirmed tracks.</div>
+          </div>
+
+          <div class="kpiBox">
+            <div class="label">Raw Confirmed Count</div>
+            <div class="kpiVal" id="rawConfirmed">0</div>
+            <div class="small">Before median smoothing.</div>
           </div>
 
           <div class="kpiBox">
@@ -96,20 +124,24 @@
             <div class="label">Tracking Settings</div>
             <div class="settings">
               <div class="settingRow">
-                <div class="small">Min person score: <span class="mono" id="minScoreLabel">0.35</span></div>
-                <input id="minScore" type="range" min="0.20" max="0.70" step="0.01" value="0.35">
+                <div class="small">Min person score: <span class="mono" id="minScoreLabel">0.32</span></div>
+                <input id="minScore" type="range" min="0.20" max="0.70" step="0.01" value="0.32">
               </div>
               <div class="settingRow">
-                <div class="small">Confirm hits (N): <span class="mono" id="confirmHitsLabel">3</span></div>
-                <input id="confirmHits" type="range" min="2" max="6" step="1" value="3">
+                <div class="small">Confirm hits: <span class="mono" id="confirmHitsLabel">2</span></div>
+                <input id="confirmHits" type="range" min="1" max="6" step="1" value="2">
               </div>
               <div class="settingRow">
-                <div class="small">Track TTL (ms): <span class="mono" id="ttlLabel">2500</span></div>
-                <input id="ttlMs" type="range" min="1200" max="6000" step="100" value="2500">
+                <div class="small">Track TTL (ms): <span class="mono" id="ttlLabel">3500</span></div>
+                <input id="ttlMs" type="range" min="1200" max="6000" step="100" value="3500">
               </div>
               <div class="settingRow">
-                <div class="small">Detect interval (ms): <span class="mono" id="detMsLabel2">250</span></div>
-                <input id="detMs" type="range" min="150" max="600" step="25" value="250">
+                <div class="small">Detect interval (ms): <span class="mono" id="detMsLabel2">175</span></div>
+                <input id="detMs" type="range" min="120" max="600" step="5" value="175">
+              </div>
+              <div class="settingRow">
+                <div class="small">NMS IoU threshold: <span class="mono" id="nmsLabel">0.50</span></div>
+                <input id="nmsIou" type="range" min="0.30" max="0.70" step="0.01" value="0.50">
               </div>
             </div>
           </div>
@@ -119,43 +151,39 @@
     </div>
   </div>
 
-  <!-- TFJS + COCO-SSD (CDN globals: tf, cocoSsd) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <script>
-    // ====== UI helpers ======
     const $ = (id) => document.getElementById(id);
     const logsEl = $("logs");
 
     function ts() { return new Date().toISOString(); }
-    function log(msg, level="info") {
+    function log(msg, level = "info") {
       const icon = level === "error" ? "✖" : level === "ok" ? "✓" : "i";
-      const line = `[${ts()}] ${icon} ${msg}\n`;
-      logsEl.textContent = line + logsEl.textContent;
+      logsEl.textContent = `[${ts()}] ${icon} ${msg}\n` + logsEl.textContent;
     }
-    function setPill(el, text, state=null) {
+    function setPill(el, text, state = null) {
       el.textContent = text;
-      el.classList.remove("ok","bad","warn");
-      if (state === "ok") el.classList.add("ok");
-      if (state === "bad") el.classList.add("bad");
-      if (state === "warn") el.classList.add("warn");
+      el.classList.remove("ok", "bad", "warn");
+      if (state) el.classList.add(state);
     }
 
-    // ====== Clock ======
     function tickClock() { $("clock").textContent = new Date().toLocaleString(); }
     setInterval(tickClock, 250);
     tickClock();
 
-    // ====== Airtable logging via serverless function ======
     async function postToAirtable(payload) {
       const res = await fetch("/api/log", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+
       const text = await res.text();
-      if (!res.ok) throw new Error(`API /api/log failed (${res.status}): ${text.slice(0,200)}`);
+      if (!res.ok) {
+        throw new Error(`API /api/log failed (${res.status}): ${text.slice(0, 260)}`);
+      }
       return text;
     }
 
@@ -164,74 +192,67 @@
         setPill($("airPill"), "Airtable: testing…");
         await postToAirtable({ people_count: 9999, timestamp: new Date().toISOString(), test: true });
         setPill($("airPill"), "Airtable: ok", "ok");
-        log("Connections OK: logged test record people_count=9999.", "ok");
+        log("Connections OK: test row written with people_count=9999.", "ok");
       } catch (e) {
         setPill($("airPill"), "Airtable: error", "bad");
         log("Airtable error: " + e.message, "error");
       }
     }
 
-    // ====== Model + camera ======
     const video = $("video");
     const canvas = $("overlay");
     const ctx = canvas.getContext("2d");
     let stream = null;
     let model = null;
     let running = false;
+    let detectInFlight = false;
 
-    // ====== Settings (live-tunable) ======
     const settings = {
-      minScore: 0.35,
-      confirmHits: 3,
-      trackTtlMs: 2500,
-      detectIntervalMs: 250,
-      smoothAlpha: 0.35,
-      // Matching gates
-      maxCenterDistMult: 1.6, // allow center drift up to 1.6 * max(w,h)
-      // Score weighting: IoU + distance similarity
-      wIou: 0.70,
-      wDist: 0.30,
-      acceptScore: 0.22, // combined match score threshold
+      minScore: 0.32,
+      confirmHits: 2,
+      trackTtlMs: 3500,
+      detectIntervalMs: 175,
+      smoothAlpha: 0.32,
+      maxCenterDistMult: 2.0,
+      wIou: 0.50,
+      wDist: 0.25,
+      wPred: 0.25,
+      acceptScore: 0.20,
+      nmsIou: 0.50,
+      nmsMaxOutput: 100,
+      minBoxAreaRatio: 0.006,
+      minBoxWidth: 26,
+      minBoxHeight: 36,
+      maxAspectRatio: 4.0,
+      stableWindow: 7,
     };
 
     function wireSettings() {
-      const minScore = $("minScore");
-      const confirmHits = $("confirmHits");
-      const ttlMs = $("ttlMs");
-      const detMs = $("detMs");
-
-      const syncLabels = () => {
+      const sync = () => {
         $("minScoreLabel").textContent = settings.minScore.toFixed(2);
         $("confirmHitsLabel").textContent = String(settings.confirmHits);
         $("ttlLabel").textContent = String(settings.trackTtlMs);
         $("detMsLabel").textContent = String(settings.detectIntervalMs);
         $("detMsLabel2").textContent = String(settings.detectIntervalMs);
+        $("nmsLabel").textContent = settings.nmsIou.toFixed(2);
       };
-
-      minScore.addEventListener("input", () => { settings.minScore = parseFloat(minScore.value); syncLabels(); });
-      confirmHits.addEventListener("input", () => { settings.confirmHits = parseInt(confirmHits.value, 10); syncLabels(); });
-      ttlMs.addEventListener("input", () => { settings.trackTtlMs = parseInt(ttlMs.value, 10); syncLabels(); });
-      detMs.addEventListener("input", () => { settings.detectIntervalMs = parseInt(detMs.value, 10); syncLabels(); });
-
-      syncLabels();
+      $("minScore").addEventListener("input", e => { settings.minScore = parseFloat(e.target.value); sync(); });
+      $("confirmHits").addEventListener("input", e => { settings.confirmHits = parseInt(e.target.value, 10); sync(); });
+      $("ttlMs").addEventListener("input", e => { settings.trackTtlMs = parseInt(e.target.value, 10); sync(); });
+      $("detMs").addEventListener("input", e => { settings.detectIntervalMs = parseInt(e.target.value, 10); sync(); });
+      $("nmsIou").addEventListener("input", e => { settings.nmsIou = parseFloat(e.target.value); sync(); });
+      sync();
     }
     wireSettings();
 
-    // ====== Tracking (stable IDs) ======
-    /**
-     * Track object:
-     * {
-     *   id: number,
-     *   bbox: [x,y,w,h],
-     *   lastSeen: number,
-     *   hits: number,
-     *   misses: number,
-     *   confirmed: boolean
-     * }
-     */
-    let tracks = new Map(); // id -> track
+    let tracks = new Map();
     let nextId = 1;
     const seenConfirmedIds = new Set();
+    const stableCountHistory = [];
+    let lastDetectAt = 0;
+    let latestStableCount = 0;
+    let latestRawConfirmed = 0;
+    let lastSent = -1;
 
     function resizeCanvasToVideo() {
       const w = video.videoWidth || 0;
@@ -252,78 +273,140 @@
     }
 
     function centerOf(box) {
-      return [box[0] + box[2]/2, box[1] + box[3]/2];
+      return [box[0] + box[2] / 2, box[1] + box[3] / 2];
+    }
+
+    function dist(a, b) {
+      return Math.hypot(a[0] - b[0], a[1] - b[1]);
     }
 
     function smoothBox(oldBox, newBox, alpha) {
       return [
-        oldBox[0] + (newBox[0]-oldBox[0]) * alpha,
-        oldBox[1] + (newBox[1]-oldBox[1]) * alpha,
-        oldBox[2] + (newBox[2]-oldBox[2]) * alpha,
-        oldBox[3] + (newBox[3]-oldBox[3]) * alpha,
+        oldBox[0] + (newBox[0] - oldBox[0]) * alpha,
+        oldBox[1] + (newBox[1] - oldBox[1]) * alpha,
+        oldBox[2] + (newBox[2] - oldBox[2]) * alpha,
+        oldBox[3] + (newBox[3] - oldBox[3]) * alpha,
       ];
     }
 
-    function matchScore(detBox, trackBox) {
-      // Distance gating (reduces ID swaps when people sit close)
-      const [dx,dy] = centerOf(detBox);
-      const [tx,ty] = centerOf(trackBox);
-      const dist = Math.hypot(dx-tx, dy-ty);
+    function predictedBox(track, now) {
+      const dt = Math.min((now - track.lastSeen) / Math.max(settings.detectIntervalMs, 1), 3);
+      return [
+        track.bbox[0] + track.vx * dt,
+        track.bbox[1] + track.vy * dt,
+        track.bbox[2],
+        track.bbox[3]
+      ];
+    }
 
-      const scale = Math.max(trackBox[2], trackBox[3], 1);
-      const distNorm = dist / scale;
-      if (distNorm > settings.maxCenterDistMult) return -1; // reject outright
+    function median(values) {
+      if (!values.length) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    }
 
-      const i = iou(detBox, trackBox);
+    async function suppressDuplicates(persons) {
+      if (!persons.length) return [];
 
-      // Convert distance to similarity [0..1]
-      const distSim = 1 - Math.min(distNorm / settings.maxCenterDistMult, 1);
+      const boxes = persons.map(p => [p.bbox[1], p.bbox[0], p.bbox[1] + p.bbox[3], p.bbox[0] + p.bbox[2]]);
+      const scores = persons.map(p => p.score ?? 0);
 
-      return settings.wIou * i + settings.wDist * distSim;
+      const boxesT = tf.tensor2d(boxes);
+      const scoresT = tf.tensor1d(scores);
+
+      try {
+        const selected = await tf.image.nonMaxSuppressionAsync(
+          boxesT,
+          scoresT,
+          settings.nmsMaxOutput,
+          settings.nmsIou,
+          settings.minScore
+        );
+        const idx = await selected.array();
+        return idx.map(i => persons[i]);
+      } finally {
+        boxesT.dispose();
+        scoresT.dispose();
+      }
+    }
+
+    function filterPersons(preds) {
+      const frameArea = Math.max((video.videoWidth || 1) * (video.videoHeight || 1), 1);
+
+      return preds
+        .filter(p => p.class === "person" && (p.score ?? 0) >= settings.minScore)
+        .map(p => ({ bbox: p.bbox, score: p.score }))
+        .filter(p => {
+          const [x, y, w, h] = p.bbox;
+          if (w < settings.minBoxWidth || h < settings.minBoxHeight) return false;
+          if ((w * h) / frameArea < settings.minBoxAreaRatio) return false;
+          const ar = w / Math.max(h, 1);
+          if (ar > settings.maxAspectRatio) return false;
+          if (ar < 1 / settings.maxAspectRatio) return false;
+          if (x + w < 0 || y + h < 0) return false;
+          return true;
+        });
+    }
+
+    function matchScore(detBox, track, now) {
+      const currentBox = track.bbox;
+      const predBox = predictedBox(track, now);
+
+      const detCenter = centerOf(detBox);
+      const currentCenter = centerOf(currentBox);
+      const predCenter = centerOf(predBox);
+      const scale = Math.max(currentBox[2], currentBox[3], 1);
+
+      const currentDistNorm = dist(detCenter, currentCenter) / scale;
+      const predDistNorm = dist(detCenter, predCenter) / scale;
+      if (Math.min(currentDistNorm, predDistNorm) > settings.maxCenterDistMult) return -1;
+
+      const iouSim = Math.max(iou(detBox, currentBox), iou(detBox, predBox));
+      const distSim = 1 - Math.min(currentDistNorm / settings.maxCenterDistMult, 1);
+      const predSim = 1 - Math.min(predDistNorm / settings.maxCenterDistMult, 1);
+
+      return settings.wIou * iouSim + settings.wDist * distSim + settings.wPred * predSim;
     }
 
     function updateTracks(detections) {
       const now = performance.now();
-
-      // Mark all tracks as "unmatched" initially
       const unmatchedTrackIds = new Set(tracks.keys());
       const usedTrackIds = new Set();
-
-      // We'll store match results: detIndex -> trackId
       const detToTrack = new Array(detections.length).fill(null);
 
-      // Greedy matching (works fine at 30–50 people with throttled detection)
+      // Greedy assignment by best global score.
+      const candidatePairs = [];
       for (let di = 0; di < detections.length; di++) {
-        const d = detections[di];
-        let bestId = null;
-        let bestScore = -1;
-
-        for (const [id, t] of tracks.entries()) {
-          if (usedTrackIds.has(id)) continue;
-
-          const s = matchScore(d.bbox, t.bbox);
-          if (s > bestScore) {
-            bestScore = s;
-            bestId = id;
+        for (const [id, track] of tracks.entries()) {
+          const score = matchScore(detections[di].bbox, track, now);
+          if (score >= settings.acceptScore) {
+            candidatePairs.push({ di, id, score });
           }
         }
+      }
+      candidatePairs.sort((a, b) => b.score - a.score);
 
-        if (bestId !== null && bestScore >= settings.acceptScore) {
-          detToTrack[di] = bestId;
-          usedTrackIds.add(bestId);
-          unmatchedTrackIds.delete(bestId);
-        }
+      for (const pair of candidatePairs) {
+        if (detToTrack[pair.di] !== null) continue;
+        if (usedTrackIds.has(pair.id)) continue;
+        detToTrack[pair.di] = pair.id;
+        usedTrackIds.add(pair.id);
+        unmatchedTrackIds.delete(pair.id);
       }
 
-      // Update matched tracks
       for (let di = 0; di < detections.length; di++) {
-        const d = detections[di];
-        const matchedId = detToTrack[di];
+        const det = detections[di];
+        const trackId = detToTrack[di];
 
-        if (matchedId !== null) {
-          const t = tracks.get(matchedId);
+        if (trackId !== null) {
+          const t = tracks.get(trackId);
+          const oldCenter = centerOf(t.bbox);
+          const newCenter = centerOf(det.bbox);
 
-          t.bbox = smoothBox(t.bbox, d.bbox, settings.smoothAlpha);
+          t.vx = (newCenter[0] - oldCenter[0]) * 0.65 + t.vx * 0.35;
+          t.vy = (newCenter[1] - oldCenter[1]) * 0.65 + t.vy * 0.35;
+          t.bbox = smoothBox(t.bbox, det.bbox, settings.smoothAlpha);
           t.lastSeen = now;
           t.hits += 1;
           t.misses = 0;
@@ -332,58 +415,35 @@
             t.confirmed = true;
             seenConfirmedIds.add(t.id);
           }
-
-          tracks.set(matchedId, t);
+          tracks.set(trackId, t);
         } else {
-          // Create new tentative track
           const id = nextId++;
           tracks.set(id, {
             id,
-            bbox: d.bbox,
+            bbox: det.bbox,
             lastSeen: now,
             hits: 1,
             misses: 0,
-            confirmed: false,
+            confirmed: settings.confirmHits <= 1,
+            vx: 0,
+            vy: 0,
           });
+          if (settings.confirmHits <= 1) seenConfirmedIds.add(id);
         }
       }
 
-      // Age unmatched tracks
       for (const id of unmatchedTrackIds) {
         const t = tracks.get(id);
-        t.misses += 1;
+        if (!t) continue;
 
-        // Keep for TTL to survive brief missed detections (occlusion, lighting)
+        t.misses += 1;
+        t.bbox = predictedBox(t, now);
+
         if (now - t.lastSeen > settings.trackTtlMs) {
           tracks.delete(id);
         } else {
           tracks.set(id, t);
         }
-      }
-    }
-
-    function drawOverlay() {
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.lineWidth = 3;
-      ctx.font = "16px ui-monospace, Menlo, Consolas, monospace";
-
-      for (const [id, t] of tracks.entries()) {
-        const [x,y,w,h] = t.bbox;
-
-        const isConfirmed = t.confirmed;
-        ctx.strokeStyle = isConfirmed ? "#00e5a8" : "#ffd43b";
-        ctx.strokeRect(x,y,w,h);
-
-        const label = isConfirmed ? `ID ${id}` : `ID ${id} (T)`;
-        const pad = 4;
-        const tw = ctx.measureText(label).width;
-        const th = 18;
-
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(x, Math.max(0,y-th-6), tw+pad*2, th+6);
-
-        ctx.fillStyle = "#e8eefc";
-        ctx.fillText(label, x+pad, Math.max(14,y-10));
       }
     }
 
@@ -393,31 +453,55 @@
       return c;
     }
 
-    // ====== Detection loop (throttled) ======
-    let lastDetectAt = 0;
-    let latestConfirmed = 0;
-    let lastSent = -1;
+    function updateStableCount(rawCount) {
+      stableCountHistory.push(rawCount);
+      if (stableCountHistory.length > settings.stableWindow) stableCountHistory.shift();
+      latestRawConfirmed = rawCount;
+      latestStableCount = median(stableCountHistory);
+      $("rawConfirmed").textContent = String(latestRawConfirmed);
+      $("peopleCount").textContent = String(latestStableCount);
+    }
+
+    function drawOverlay() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 3;
+      ctx.font = "16px ui-monospace, Menlo, Consolas, monospace";
+
+      for (const [id, t] of tracks.entries()) {
+        const [x, y, w, h] = t.bbox;
+        ctx.strokeStyle = t.confirmed ? "#00e5a8" : "#ffd43b";
+        ctx.strokeRect(x, y, w, h);
+
+        const label = t.confirmed ? `ID ${id}` : `ID ${id} (T)`;
+        const pad = 4;
+        const tw = ctx.measureText(label).width;
+        const th = 18;
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(x, Math.max(0, y - th - 6), tw + pad * 2, th + 6);
+        ctx.fillStyle = "#e8eefc";
+        ctx.fillText(label, x + pad, Math.max(14, y - 10));
+      }
+    }
 
     async function detectTick() {
-      if (!model || video.readyState < 2) return;
+      if (!model || video.readyState < 2 || detectInFlight) return;
+      detectInFlight = true;
 
       try {
         const preds = await model.detect(video);
-
-        const persons = preds
-          .filter(p => p.class === "person" && (p.score ?? 0) >= settings.minScore)
-          .map(p => ({ bbox: p.bbox, score: p.score }));
+        const filtered = filterPersons(preds);
+        const persons = await suppressDuplicates(filtered);
 
         updateTracks(persons);
         drawOverlay();
 
-        latestConfirmed = confirmedCount();
-        $("peopleCount").textContent = String(latestConfirmed);
+        updateStableCount(confirmedCount());
         $("activeIds").textContent = String(tracks.size);
         $("uniqueSeen").textContent = String(seenConfirmedIds.size);
-
       } catch (e) {
         log("Detection error: " + e.message, "error");
+      } finally {
+        detectInFlight = false;
       }
     }
 
@@ -426,21 +510,16 @@
       requestAnimationFrame(loop);
 
       resizeCanvasToVideo();
-
       const now = performance.now();
       if (now - lastDetectAt < settings.detectIntervalMs) return;
       lastDetectAt = now;
-
-      // Fire and forget per tick (keeps UI responsive)
       detectTick();
     }
 
-    // ====== Camera ======
     async function startCamera() {
       try {
         $("startBtn").disabled = true;
         $("stopBtn").disabled = false;
-
         setPill($("camPill"), "Camera: starting…");
         log("Starting camera…");
 
@@ -468,55 +547,53 @@
 
     function stopCamera() {
       running = false;
-
       if (stream) {
         stream.getTracks().forEach(t => t.stop());
         stream = null;
       }
       video.srcObject = null;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       tracks.clear();
-      // Keep session unique IDs unless you want to reset:
-      // seenConfirmedIds.clear();
-
-      latestConfirmed = 0;
+      stableCountHistory.length = 0;
+      latestStableCount = 0;
+      latestRawConfirmed = 0;
+      lastSent = -1;
       $("peopleCount").textContent = "0";
+      $("rawConfirmed").textContent = "0";
       $("activeIds").textContent = "0";
-      $("uniqueSeen").textContent = String(seenConfirmedIds.size);
-
       $("startBtn").disabled = false;
       $("stopBtn").disabled = true;
       setPill($("camPill"), "Camera: stopped", "bad");
       log("Camera stopped.");
     }
 
-    // ====== Airtable push (only when confirmed count changes) ======
     setInterval(async () => {
       if (!running) return;
-      if (latestConfirmed === lastSent) return;
+      if (latestStableCount === lastSent) return;
 
       try {
         setPill($("airPill"), "Airtable: sending…");
         await postToAirtable({
-          people_count: latestConfirmed,
+          people_count: latestStableCount,
+          raw_people_count: latestRawConfirmed,
+          active_track_ids: tracks.size,
+          unique_confirmed_ids: seenConfirmedIds.size,
           timestamp: new Date().toISOString()
         });
-        lastSent = latestConfirmed;
+        lastSent = latestStableCount;
         setPill($("airPill"), "Airtable: ok", "ok");
-        log(`Logged to Airtable: people_count=${latestConfirmed}`, "ok");
+        log(`Logged stable people_count=${latestStableCount} (raw=${latestRawConfirmed})`, "ok");
       } catch (e) {
         setPill($("airPill"), "Airtable: error", "bad");
         log("Airtable error: " + e.message, "error");
       }
     }, 5000);
 
-    // ====== Model load ======
     async function boot() {
       try {
         setPill($("modelPill"), "Model: loading…");
         log("Loading COCO-SSD model…");
-        model = await cocoSsd.load(); // correct CDN global
+        model = await cocoSsd.load();
         setPill($("modelPill"), "Model: ready", "ok");
         log("Model loaded successfully.", "ok");
       } catch (e) {
@@ -525,7 +602,6 @@
       }
     }
 
-    // ====== Wire buttons ======
     $("startBtn").addEventListener("click", startCamera);
     $("stopBtn").addEventListener("click", stopCamera);
     $("testBtn").addEventListener("click", validateConnections);
