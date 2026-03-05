@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Live People Counter</title>
+  <title>Live People Counter (Face Boxes)</title>
 
-  <!-- MediaPipe (for person/face boxes) -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <!-- Face API (UMD global: window.faceapi) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <style>
     :root { color-scheme: dark; }
@@ -17,18 +16,10 @@
       background: #0b1020;
       color: #e8eefc;
     }
-    .wrap {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 28px 18px 40px;
-    }
-    h1 { margin: 0 0 6px; font-size: 44px; letter-spacing: .2px; }
-    .sub { margin: 0 0 18px; opacity: .8; }
-    .grid {
-      display: grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap: 16px;
-    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 18px 40px; }
+    h1 { margin: 0 0 6px; font-size: 42px; }
+    .sub { margin: 0 0 16px; opacity: .8; }
+    .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
     .card {
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
@@ -71,18 +62,13 @@
     }
     .pill.ok { border-color: rgba(66, 255, 164, .35); background: rgba(66,255,164,.12); }
     .pill.bad { border-color: rgba(255, 92, 92, .35); background: rgba(255,92,92,.12); }
-    .bigCount {
-      font-size: 84px;
-      font-weight: 800;
-      line-height: 1;
-      margin: 6px 0 0;
-    }
+    .bigCount { font-size: 84px; font-weight: 800; line-height: 1; margin: 6px 0 0; }
     .label { opacity: .75; letter-spacing: .12em; font-size: 12px; text-transform: uppercase; }
     #logs {
       white-space: pre-wrap;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       font-size: 12px;
-      max-height: 260px;
+      max-height: 280px;
       overflow: auto;
       padding: 12px;
       border-radius: 12px;
@@ -96,7 +82,7 @@
 <body>
   <div class="wrap">
     <h1>Live People Counter</h1>
-    <p class="sub">Webcam + detector boxes + logs to Airtable via <code>/api/log</code>.</p>
+    <p class="sub">Webcam + face boxes + logs to Airtable via <code>/api/log</code>.</p>
 
     <div class="grid">
       <div class="card">
@@ -107,7 +93,7 @@
 
         <div class="row" style="margin-top:14px;">
           <div>
-            <div class="label">People Detected</div>
+            <div class="label">Faces Detected</div>
             <div id="count" class="bigCount">0</div>
           </div>
           <div style="flex:1"></div>
@@ -136,10 +122,8 @@
     </div>
   </div>
 
-  <script type="module">
-    // =========================
-    // Page-level crash logging
-    // =========================
+  <script>
+    // ---------- Logging ----------
     const logsEl = document.getElementById("logs");
     const log = (msg, type="info") => {
       const ts = new Date().toISOString();
@@ -149,18 +133,14 @@
     window.addEventListener("error", (e) => log(`PAGE ERROR: ${e.message}`, "err"));
     window.addEventListener("unhandledrejection", (e) => log(`PROMISE ERROR: ${String(e.reason)}`, "err"));
 
-    // =========================
-    // UI refs
-    // =========================
+    // ---------- UI ----------
     const video = document.getElementById("video");
     const canvas = document.getElementById("overlay");
     const ctx = canvas.getContext("2d");
     const countEl = document.getElementById("count");
     const dtEl = document.getElementById("dt");
-
     const pillCamera = document.getElementById("pillCamera");
     const pillAirtable = document.getElementById("pillAirtable");
-
     const btnStart = document.getElementById("btnStart");
     const btnStop = document.getElementById("btnStop");
     const btnValidate = document.getElementById("btnValidate");
@@ -171,19 +151,11 @@
       el.textContent = text;
     };
 
-    // =========================
-    // Clock
-    // =========================
-    const tick = () => {
-      const d = new Date();
-      dtEl.textContent = d.toLocaleString();
-    };
-    tick();
-    setInterval(tick, 1000);
+    // ---------- Clock ----------
+    const tick = () => (dtEl.textContent = new Date().toLocaleString());
+    tick(); setInterval(tick, 1000);
 
-    // =========================
-    // Airtable logging via /api/log
-    // =========================
+    // ---------- Airtable via /api/log ----------
     async function postToAirtable(peopleCount) {
       const resp = await fetch("/api/log", {
         method: "POST",
@@ -193,7 +165,6 @@
           timestamp: new Date().toISOString()
         })
       });
-
       const text = await resp.text();
       if (!resp.ok) throw new Error(`Airtable log failed (${resp.status}): ${text}`);
       return text;
@@ -211,110 +182,84 @@
       }
     }
 
-    // =========================
-    // MediaPipe FaceDetection setup (boxes)
-    // =========================
-    // Note: We use face_detection for "face-ish" boxes. For true full-body person boxes,
-    // you'd use a different model (Pose/BlazePose or Object Detection).
-    const faceDetection = new FaceDetection.FaceDetection({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-    });
-    faceDetection.setOptions({
-      model: "short",            // fast
-      minDetectionConfidence: 0.5
-    });
-
-    let latestCount = 0;
-    let camera = null;
+    // ---------- Face detection loop ----------
+    let stream = null;
     let running = false;
+    let latestCount = 0;
+    let lastSent = null;
+    let loopHandle = null;
 
     function resizeCanvasToVideo() {
       const w = video.videoWidth || 1280;
       const h = video.videoHeight || 720;
-      canvas.width = w;
-      canvas.height = h;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
     }
 
-    faceDetection.onResults((results) => {
-      if (!running) return;
+    async function loadModels() {
+      // We load the tiny face detector model from a CDN-hosted model pack.
+      // This is the simplest “no files in repo” approach.
+      const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights";
+      log("Loading face detector model...");
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      log("Model loaded.", "ok");
+    }
 
-      resizeCanvasToVideo();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const dets = results.detections || [];
-      latestCount = dets.length;
-      countEl.textContent = String(latestCount);
-
-      // draw boxes
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#2cff9a";
-      ctx.font = "18px Arial";
-      ctx.fillStyle = "#2cff9a";
-
-      dets.forEach((det, idx) => {
-        const bb = det.boundingBox;
-        if (!bb) return;
-        const x = bb.xMin * canvas.width;
-        const y = bb.yMin * canvas.height;
-        const w = bb.width * canvas.width;
-        const h = bb.height * canvas.height;
-        ctx.strokeRect(x, y, w, h);
-        ctx.fillText(`Face ${idx+1}`, x + 6, Math.max(18, y - 6));
-      });
-    });
-
-    // =========================
-    // Webcam start/stop
-    // =========================
     async function startCamera() {
       try {
         if (running) return;
 
+        btnStart.disabled = true;
         setPill(pillCamera, false, "Camera: starting...");
         log("Starting camera...");
 
-        // Use MediaPipe Camera helper (handles getUserMedia + frame loop)
-        camera = new Camera(video, {
-          onFrame: async () => {
-            await faceDetection.send({ image: video });
-          },
-          width: 1280,
-          height: 720
+        // Wait until faceapi is available (script is defer)
+        if (!window.faceapi) throw new Error("face-api.js did not load.");
+
+        await loadModels();
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 },
+          audio: false
+        });
+        video.srcObject = stream;
+
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => resolve();
         });
 
-        await camera.start();
-
         running = true;
-        btnStart.disabled = true;
         btnStop.disabled = false;
-
         setPill(pillCamera, true, "Camera: ok");
         log("Camera started.", "ok");
+
+        // start detection loop
+        detectLoop();
       } catch (e) {
         running = false;
         btnStart.disabled = false;
         btnStop.disabled = true;
         setPill(pillCamera, false, "Camera: error");
-        log(`Camera error: ${String(e)}`, "err");
+        log(`Camera start error: ${String(e)}`, "err");
       }
     }
 
-    async function stopCamera() {
+    function stopCamera() {
       try {
-        if (!camera) return;
         running = false;
+        if (loopHandle) cancelAnimationFrame(loopHandle);
+        loopHandle = null;
 
-        // Stop tracks to release webcam
-        const stream = video.srcObject;
-        if (stream && stream.getTracks) stream.getTracks().forEach(t => t.stop());
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        stream = null;
         video.srcObject = null;
 
-        camera = null;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        latestCount = 0;
+        countEl.textContent = "0";
 
         btnStart.disabled = false;
         btnStop.disabled = true;
-
         setPill(pillCamera, false, "Camera: stopped");
         log("Camera stopped.");
       } catch (e) {
@@ -322,11 +267,40 @@
       }
     }
 
-    // =========================
-    // Periodic logging (every 5s when count changes)
-    // =========================
-    let lastSent = null;
+    async function detectLoop() {
+      if (!running) return;
 
+      try {
+        resizeCanvasToVideo();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
+        const detections = await faceapi.detectAllFaces(video, options);
+
+        latestCount = detections.length;
+        countEl.textContent = String(latestCount);
+
+        // Draw boxes
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#2cff9a";
+        ctx.fillStyle = "#2cff9a";
+        ctx.font = "18px Arial";
+
+        detections.forEach((d, i) => {
+          const b = d.box;
+          ctx.strokeRect(b.x, b.y, b.width, b.height);
+          ctx.fillText(`Face ${i+1}`, b.x + 6, Math.max(18, b.y - 6));
+        });
+
+      } catch (e) {
+        setPill(pillCamera, false, "Camera: error");
+        log(`Detect loop error: ${String(e)}`, "err");
+      }
+
+      loopHandle = requestAnimationFrame(detectLoop);
+    }
+
+    // ---------- periodic send to Airtable ----------
     async function maybeSendCount() {
       if (!running) return;
       if (lastSent === latestCount) return;
@@ -343,16 +317,12 @@
     }
     setInterval(maybeSendCount, 5000);
 
-    // =========================
-    // Bind buttons
-    // =========================
+    // ---------- bind ----------
     btnStart.addEventListener("click", startCamera);
     btnStop.addEventListener("click", stopCamera);
     btnValidate.addEventListener("click", validateConnections);
 
-    // Initial checks
     log("Page loaded. Click 'Start Camera' to begin.");
-    // Try a lightweight Airtable ping by sending 9999 only when user clicks Validate.
   </script>
 </body>
 </html>
