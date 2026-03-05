@@ -1,402 +1,534 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Audience Tracker (Person Boxes + IDs)</title>
-
-  <!-- TensorFlow.js + COCO-SSD (person detector) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live People Counter (Tracking IDs)</title>
   <style>
-    :root { color-scheme: dark; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #0b1020;
-      color: #e8eefc;
+    :root{
+      --bg:#0b1020; --panel:#111a33; --panel2:#0f1730; --text:#e8eefc; --muted:#9bb0d3;
+      --ok:#2bd576; --warn:#ffcc66; --bad:#ff5c5c; --accent:#4c7dff;
     }
-    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 40px; }
-    h1 { margin: 0 0 6px; font-size: 40px; }
-    .sub { margin: 0 0 16px; opacity: .8; }
-
-    .grid { display: grid; grid-template-columns: 1.3fr .7fr; gap: 16px; }
-    .card {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 20px 40px rgba(0,0,0,.35);
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:radial-gradient(1200px 600px at 20% 0%, #1a2b5a 0%, var(--bg) 60%);
+      color:var(--text);
     }
-
-    .videoWrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16/9;
-      background: #000;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.10);
+    header{padding:22px 22px 10px}
+    h1{margin:0 0 6px; font-size:40px; letter-spacing:-0.02em}
+    .sub{color:var(--muted); font-size:16px}
+    .wrap{
+      display:grid; grid-template-columns: 1.7fr 1fr; gap:18px;
+      padding:18px 22px 26px;
+      max-width:1300px; margin:0 auto;
     }
-    video, canvas {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:22px;
+      box-shadow:0 18px 40px rgba(0,0,0,.35);
+      overflow:hidden;
     }
-
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-    button {
-      border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-weight: 700;
-      cursor: pointer;
-      background: #2d6cdf;
-      color: white;
+    .card .inner{padding:18px}
+    .videoCard{padding:16px}
+    .stage{
+      position:relative; width:100%; aspect-ratio: 16/9; background:#000;
+      border-radius:18px; overflow:hidden;
     }
-    button.secondary { background: rgba(255,255,255,.14); }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-
-    .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.10);
-      font-weight: 600;
-      font-size: 13px;
+    video{width:100%; height:100%; object-fit:cover; display:block}
+    canvas{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+    .controls{
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+      padding:14px 0 0;
     }
-    .pill.ok { border-color: rgba(66, 255, 164, .35); background: rgba(66,255,164,.12); }
-    .pill.bad { border-color: rgba(255, 92, 92, .35); background: rgba(255,92,92,.12); }
-    .pill.warn { border-color: rgba(255, 204, 0, .35); background: rgba(255,204,0,.12); }
-
-    .kpi { font-size: 64px; font-weight: 800; margin: 8px 0 0; line-height: 1; }
-    .label { opacity: .75; letter-spacing: .12em; font-size: 12px; text-transform: uppercase; }
-
-    #logs {
-      white-space: pre-wrap;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      font-size: 12px;
-      max-height: 320px;
-      overflow: auto;
-      padding: 12px;
-      border-radius: 12px;
-      background: rgba(0,0,0,.35);
-      border: 1px solid rgba(255,255,255,0.08);
+    button{
+      border:0; border-radius:14px; padding:12px 16px; font-weight:700;
+      background:#1c2a55; color:var(--text); cursor:pointer;
     }
-
-    .muted { opacity: .8; font-size: 13px; margin-top: 8px; }
+    button.primary{background:var(--accent)}
+    button:disabled{opacity:.55; cursor:not-allowed}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 12px; border-radius:999px; font-weight:700; font-size:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.18);
+    }
+    .dot{width:10px; height:10px; border-radius:50%}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    .bad{color:var(--bad)}
+    .grid{
+      display:grid; grid-template-columns:1fr; gap:14px;
+    }
+    .metric .label{color:var(--muted); font-size:12px; letter-spacing:.12em}
+    .metric .value{font-size:64px; font-weight:900; margin-top:6px}
+    .metric small{color:var(--muted)}
+    .log{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background:rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      padding:12px;
+      height:200px;
+      overflow:auto;
+      white-space:pre-wrap;
+      line-height:1.25rem;
+      font-size:12.5px;
+    }
+    @media (max-width: 980px){
+      .wrap{grid-template-columns:1fr}
+      .metric .value{font-size:56px}
+    }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <h1>Audience Tracker</h1>
-    <p class="sub">Wide-shot person detection + tracking IDs + overlay boxes (foundation for smile/clap/engagement).</p>
+<header>
+  <h1>Live People Counter</h1>
+  <div class="sub">Wide-shot person detection + tracking IDs + overlay boxes (stable count uses tracked IDs).</div>
+</header>
 
-    <div class="grid">
-      <div class="card">
-        <div class="videoWrap">
-          <video id="video" autoplay playsinline muted></video>
-          <canvas id="overlay"></canvas>
-        </div>
+<div class="wrap">
+  <div class="card videoCard">
+    <div class="stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+    </div>
 
-        <div class="row">
-          <button id="btnStart">Start Camera</button>
-          <button id="btnStop" class="secondary" disabled>Stop</button>
+    <div class="controls">
+      <button id="startBtn" class="primary">Start Camera</button>
+      <button id="stopBtn" disabled>Stop</button>
 
-          <span id="pillModel" class="pill warn">Model: loading…</span>
-          <span id="pillCam" class="pill bad">Camera: idle</span>
-        </div>
+      <span class="pill" id="modelPill"><span class="dot" style="background:var(--warn)"></span>Model: loading…</span>
+      <span class="pill" id="camPill"><span class="dot" style="background:var(--bad)"></span>Camera: stopped</span>
+      <span class="pill" id="airPill"><span class="dot" style="background:var(--warn)"></span>Airtable: unknown</span>
 
-        <div class="muted">
-          Tip: for better detection, avoid strong backlight (don’t point camera at bright windows).
-        </div>
-      </div>
+      <button id="validateBtn">Validate Connections (send 9999)</button>
+    </div>
 
-      <div class="card">
-        <div class="label">Date & Time</div>
-        <div id="dt" style="font-size:28px; font-weight:800; margin:8px 0 12px;">—</div>
-
-        <div class="label">People detected (current)</div>
-        <div class="kpi" id="peopleNow">0</div>
-
-        <div class="label" style="margin-top:12px;">Active track IDs (current)</div>
-        <div class="kpi" id="tracksNow">0</div>
-
-        <div class="label" style="margin-top:12px;">Unique IDs seen (session)</div>
-        <div class="kpi" id="uniqueTotal">0</div>
-
-        <div class="label" style="margin-top:16px;">Logs</div>
-        <div id="logs"></div>
-      </div>
+    <div style="margin-top:10px; color:var(--muted); font-size:14px">
+      Sends updates to Airtable via <code>/api/log</code> when the tracked count changes (debounced).
     </div>
   </div>
 
-<script>
-(() => {
-  // ---------- Crash logging ----------
-  const logsEl = document.getElementById("logs");
-  const log = (msg, type="info") => {
-    const ts = new Date().toISOString();
-    const icon = type === "err" ? "✖" : type === "ok" ? "✔" : type === "warn" ? "⚠" : "i";
-    logsEl.textContent = `[${ts}] ${icon} ${msg}\n` + logsEl.textContent;
-  };
-  window.addEventListener("error", (e) => log(`PAGE ERROR: ${e.message}`, "err"));
-  window.addEventListener("unhandledrejection", (e) => log(`PROMISE ERROR: ${String(e.reason)}`, "err"));
+  <div class="card">
+    <div class="inner grid">
+      <div class="metric">
+        <div class="label">DATE &amp; TIME</div>
+        <div style="font-size:34px;font-weight:900;margin-top:8px" id="clock">—</div>
+        <small>Local browser time.</small>
+      </div>
 
-  // ---------- UI refs ----------
+      <div class="metric">
+        <div class="label">PEOPLE DETECTED (CURRENT)</div>
+        <div class="value" id="peopleNow">0</div>
+        <small>Uses <b>tracked IDs</b> (stable), not raw detections.</small>
+      </div>
+
+      <div class="metric">
+        <div class="label">ACTIVE TRACK IDS (CURRENT)</div>
+        <div class="value" id="tracksNow">0</div>
+      </div>
+
+      <div class="metric">
+        <div class="label">UNIQUE IDS SEEN (SESSION)</div>
+        <div class="value" id="uniqueSeen">0</div>
+      </div>
+
+      <div>
+        <div class="label" style="color:var(--muted); font-size:12px; letter-spacing:.12em; margin-bottom:8px">LOGS</div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // -----------------------------
+  // Tunables for wide-shot rooms
+  // -----------------------------
+  const DETECT_EVERY_MS = 250;       // more frequent = less drift
+  const SCORE_THRESHOLD = 0.30;      // lower helps small/partial people
+  const IOU_MATCH_THRESHOLD = 0.18;  // more forgiving matching
+  const MAX_MISSES = 18;             // keep tracks alive through brief misses
+  const SMOOTH = 0.72;               // more smoothing reduces jitter
+
+  // Airtable logging behavior
+  const SEND_EVERY_MS = 5000;        // debounced push
+  const SEND_ON_CHANGE_ONLY = true;
+
+  // -----------------------------
+  // UI elements
+  // -----------------------------
   const video = document.getElementById("video");
   const canvas = document.getElementById("overlay");
   const ctx = canvas.getContext("2d");
 
-  const dtEl = document.getElementById("dt");
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const validateBtn = document.getElementById("validateBtn");
+
+  const modelPill = document.getElementById("modelPill");
+  const camPill = document.getElementById("camPill");
+  const airPill = document.getElementById("airPill");
+
   const peopleNowEl = document.getElementById("peopleNow");
   const tracksNowEl = document.getElementById("tracksNow");
-  const uniqueTotalEl = document.getElementById("uniqueTotal");
+  const uniqueSeenEl = document.getElementById("uniqueSeen");
+  const clockEl = document.getElementById("clock");
+  const logEl = document.getElementById("log");
 
-  const btnStart = document.getElementById("btnStart");
-  const btnStop = document.getElementById("btnStop");
-
-  const pillModel = document.getElementById("pillModel");
-  const pillCam = document.getElementById("pillCam");
-
-  const setPill = (el, state, text) => {
-    el.classList.remove("ok","bad","warn");
-    el.classList.add(state);
-    el.textContent = text;
-  };
-
-  // ---------- Clock ----------
-  const tick = () => dtEl.textContent = new Date().toLocaleString();
-  tick();
-  setInterval(tick, 1000);
-
-  // ---------- Detection model ----------
-  let model = null;
-
-  async function loadModel() {
-    try {
-      setPill(pillModel, "warn", "Model: loading…");
-      await tf.ready();
-      model = await cocoSsd.load();
-      setPill(pillModel, "ok", "Model: ready");
-      log("COCO-SSD loaded (person detection ready).", "ok");
-    } catch (e) {
-      setPill(pillModel, "bad", "Model: error");
-      log("Failed to load COCO-SSD: " + (e?.message || e), "err");
-    }
-  }
-  loadModel();
-
-  // ---------- Tracking (lightweight IoU tracker) ----------
-  let nextTrackId = 1;
-  const tracks = new Map(); // id -> {id, bbox:{x,y,w,h}, misses, lastScore}
-  const seenIds = new Set();
-
-  // Tuning knobs for wide audience shots:
-  const SCORE_THRESHOLD = 0.40;       // raise if too many false boxes
-  const IOU_MATCH_THRESHOLD = 0.25;   // raise to reduce ID swaps, lower to keep IDs through motion
-  const MAX_MISSES = 12;              // frames to keep a track without detection (occlusion)
-  const SMOOTH = 0.60;                // bbox smoothing
-
-  function iou(a, b) {
-    const x1 = Math.max(a.x, b.x);
-    const y1 = Math.max(a.y, b.y);
-    const x2 = Math.min(a.x + a.w, b.x + b.w);
-    const y2 = Math.min(a.y + a.h, b.y + b.h);
-    const iw = Math.max(0, x2 - x1);
-    const ih = Math.max(0, y2 - y1);
-    const inter = iw * ih;
-    const union = a.w*a.h + b.w*b.h - inter;
-    return union <= 0 ? 0 : inter / union;
+  function log(msg, level="info"){
+    const ts = new Date().toISOString();
+    const icon = level === "ok" ? "✔" : level === "bad" ? "✖" : level === "warn" ? "!" : "i";
+    logEl.textContent = `[${ts}] ${icon} ${msg}\n` + logEl.textContent;
   }
 
-  function smoothBox(oldB, newB) {
-    if (!oldB) return newB;
-    return {
-      x: oldB.x * SMOOTH + newB.x * (1 - SMOOTH),
-      y: oldB.y * SMOOTH + newB.y * (1 - SMOOTH),
-      w: oldB.w * SMOOTH + newB.w * (1 - SMOOTH),
-      h: oldB.h * SMOOTH + newB.h * (1 - SMOOTH),
-      score: newB.score
-    };
+  function setPill(pillEl, label, state){
+    // state: ok | warn | bad
+    const dot = pillEl.querySelector(".dot") || (() => {
+      const d = document.createElement("span");
+      d.className = "dot";
+      pillEl.prepend(d);
+      return d;
+    })();
+
+    dot.style.background = state === "ok" ? "var(--ok)" : state === "bad" ? "var(--bad)" : "var(--warn)";
+    pillEl.lastChild && pillEl.lastChild.nodeType === Node.TEXT_NODE
+      ? pillEl.lastChild.textContent = label
+      : (pillEl.childNodes[pillEl.childNodes.length-1].textContent = label);
+    pillEl.classList.remove("ok","warn","bad");
+    pillEl.classList.add(state);
   }
 
-  function updateTracks(detections) {
-    const used = new Array(detections.length).fill(false);
+  // -----------------------------
+  // Clock
+  // -----------------------------
+  setInterval(() => {
+    const d = new Date();
+    clockEl.textContent = d.toLocaleString();
+  }, 250);
 
-    // match existing
-    for (const [id, tr] of tracks.entries()) {
-      let bestIdx = -1, best = 0;
-      for (let i=0; i<detections.length; i++) {
-        if (used[i]) continue;
-        const val = iou(tr.bbox, detections[i]);
-        if (val > best) { best = val; bestIdx = i; }
+  // -----------------------------
+  // Simple tracker (IOU + smoothing)
+  // -----------------------------
+  function iou(a, b){
+    const ax1=a.x, ay1=a.y, ax2=a.x+a.w, ay2=a.y+a.h;
+    const bx1=b.x, by1=b.y, bx2=b.x+b.w, by2=b.y+b.h;
+    const ix1=Math.max(ax1,bx1), iy1=Math.max(ay1,by1);
+    const ix2=Math.min(ax2,bx2), iy2=Math.min(ay2,by2);
+    const iw=Math.max(0, ix2-ix1), ih=Math.max(0, iy2-iy1);
+    const inter=iw*ih;
+    const union=a.w*a.h + b.w*b.h - inter;
+    return union <= 0 ? 0 : inter/union;
+  }
+
+  let nextId = 1;
+  const tracks = new Map(); // id -> {box, misses}
+  const uniqueIds = new Set();
+
+  function updateTracks(detections){
+    // detections: array of {x,y,w,h, score}
+    const usedDet = new Set();
+    const matchedTrackIds = new Set();
+
+    // match existing tracks to detections
+    for (const [id, t] of tracks.entries()){
+      let bestJ = -1;
+      let bestScore = 0;
+
+      for (let j=0;j<detections.length;j++){
+        if (usedDet.has(j)) continue;
+        const d = detections[j];
+        const s = iou(t.box, d);
+        if (s > bestScore){
+          bestScore = s;
+          bestJ = j;
+        }
       }
-      if (bestIdx >= 0 && best >= IOU_MATCH_THRESHOLD) {
-        used[bestIdx] = true;
-        tr.bbox = smoothBox(tr.bbox, detections[bestIdx]);
-        tr.misses = 0;
-        tr.lastScore = detections[bestIdx].score;
-        tracks.set(id, tr);
+
+      if (bestJ >= 0 && bestScore >= IOU_MATCH_THRESHOLD){
+        const d = detections[bestJ];
+        usedDet.add(bestJ);
+        matchedTrackIds.add(id);
+
+        // smooth box
+        t.box = {
+          x: t.box.x*SMOOTH + d.x*(1-SMOOTH),
+          y: t.box.y*SMOOTH + d.y*(1-SMOOTH),
+          w: t.box.w*SMOOTH + d.w*(1-SMOOTH),
+          h: t.box.h*SMOOTH + d.h*(1-SMOOTH),
+        };
+        t.misses = 0;
       } else {
-        tr.misses += 1;
-        tracks.set(id, tr);
+        t.misses += 1;
       }
     }
 
-    // new tracks
-    for (let i=0; i<detections.length; i++) {
-      if (used[i]) continue;
-      const id = nextTrackId++;
-      tracks.set(id, { id, bbox: detections[i], misses: 0, lastScore: detections[i].score });
-      seenIds.add(id);
+    // remove dead tracks
+    for (const [id, t] of tracks.entries()){
+      if (t.misses > MAX_MISSES) tracks.delete(id);
     }
 
-    // prune
-    for (const [id, tr] of tracks.entries()) {
-      if (tr.misses > MAX_MISSES) tracks.delete(id);
+    // add new tracks for unmatched detections
+    for (let j=0;j<detections.length;j++){
+      if (usedDet.has(j)) continue;
+      const d = detections[j];
+      const id = nextId++;
+      tracks.set(id, { box: {x:d.x,y:d.y,w:d.w,h:d.h}, misses: 0 });
+      uniqueIds.add(id);
     }
   }
 
-  // ---------- Rendering ----------
-  function resizeCanvasToVideo() {
-    const w = video.videoWidth || 1280;
-    const h = video.videoHeight || 720;
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
+  function resizeCanvasToVideo(){
+    const rect = video.getBoundingClientRect();
+    canvas.width = Math.round(rect.width);
+    canvas.height = Math.round(rect.height);
   }
 
-  function drawTracks() {
-    ctx.clearRect(0,0,canvas.width, canvas.height);
-    ctx.lineWidth = 2;
-    ctx.font = "16px ui-monospace, Menlo, Consolas, monospace";
+  function drawTracks(){
+    resizeCanvasToVideo();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    for (const tr of tracks.values()) {
-      const b = tr.bbox;
-      ctx.strokeStyle = "#22e08a";
-      ctx.strokeRect(b.x, b.y, b.w, b.h);
+    // video may be scaled; map detection coords from video pixels -> canvas pixels
+    const vw = video.videoWidth || 1;
+    const vh = video.videoHeight || 1;
+    const sx = canvas.width / vw;
+    const sy = canvas.height / vh;
 
-      const label = `ID ${tr.id}`;
+    ctx.lineWidth = 3;
+    ctx.font = "14px ui-monospace, Menlo, Consolas, monospace";
+
+    for (const [id, t] of tracks.entries()){
+      const b = t.box;
+      const x = b.x * sx, y = b.y * sy, w = b.w * sx, h = b.h * sy;
+
+      ctx.strokeStyle = "#2bd576";
+      ctx.strokeRect(x,y,w,h);
+
+      const label = `ID ${id}`;
       const pad = 6;
       const tw = ctx.measureText(label).width;
-      const lh = 20;
+      const bx = x, by = Math.max(0, y - 22);
 
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(b.x, Math.max(0, b.y - lh), tw + pad*2, lh);
+      ctx.fillStyle = "rgba(0,0,0,.65)";
+      ctx.fillRect(bx, by, tw + pad*2, 20);
+
       ctx.fillStyle = "#e8eefc";
-      ctx.fillText(label, b.x + pad, Math.max(16, b.y - 5));
+      ctx.fillText(label, bx + pad, by + 14);
     }
   }
 
-  // ---------- Main loop ----------
+  // -----------------------------
+  // Model loading (COCO-SSD)
+  // -----------------------------
+  let model = null;
+
+  async function loadModel(){
+    try{
+      setPill(modelPill, "Model: loading…", "warn");
+
+      // Load TensorFlow.js + COCO-SSD from CDN (no build step)
+      // Note: versions are pinned for stability
+      await import("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js");
+      const coco = await import("https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js");
+
+      model = await coco.load();
+      setPill(modelPill, "Model: ready", "ok");
+      log("COCO-SSD model loaded.", "ok");
+    }catch(err){
+      console.error(err);
+      setPill(modelPill, "Model: error", "bad");
+      log(`MODEL ERROR: ${err?.message || err}`, "bad");
+      throw err;
+    }
+  }
+
+  // -----------------------------
+  // Camera
+  // -----------------------------
   let stream = null;
   let running = false;
+  let detectTimer = null;
 
-  // throttle detection so it doesn't max CPU (wide shot)
-  const DETECT_EVERY_MS = 450; // ~2 FPS
-  let lastDetectAt = 0;
+  async function startCamera(){
+    try{
+      if (!model) await loadModel();
 
-  async function loop(now) {
-    if (!running) return;
-
-    try {
-      if (video.readyState >= 2) {
-        resizeCanvasToVideo();
-
-        if (now - lastDetectAt >= DETECT_EVERY_MS) {
-          lastDetectAt = now;
-
-          const preds = await model.detect(video);
-          const people = preds
-            .filter(p => p.class === "person" && p.score >= SCORE_THRESHOLD)
-            .map(p => ({
-              x: p.bbox[0],
-              y: p.bbox[1],
-              w: p.bbox[2],
-              h: p.bbox[3],
-              score: p.score
-            }));
-
-          updateTracks(people);
-
-          peopleNowEl.textContent = String(people.length);
-          tracksNowEl.textContent = String(tracks.size);
-          uniqueTotalEl.textContent = String(seenIds.size);
-        }
-
-        drawTracks();
-      }
-    } catch (e) {
-      log("Loop error: " + (e?.message || e), "err");
-    }
-
-    requestAnimationFrame(loop);
-  }
-
-  async function startCamera() {
-    try {
-      if (!model) { log("Model not ready. Wait for Model: ready.", "warn"); return; }
-      if (running) return;
-
-      setPill(pillCam, "warn", "Camera: starting…");
-      log("Starting camera…");
+      setPill(camPill, "Camera: starting…", "warn");
 
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
+        video: { facingMode: "user" }, audio: false
       });
 
       video.srcObject = stream;
       await video.play();
 
-      // reset session
-      tracks.clear();
-      seenIds.clear();
-      nextTrackId = 1;
-      peopleNowEl.textContent = "0";
-      tracksNowEl.textContent = "0";
-      uniqueTotalEl.textContent = "0";
-
-      running = true;
-      btnStart.disabled = true;
-      btnStop.disabled = false;
-      setPill(pillCam, "ok", "Camera: live");
+      setPill(camPill, "Camera: live", "ok");
       log("Camera started. Tracking IDs running.", "ok");
 
-      requestAnimationFrame(loop);
-    } catch (e) {
-      setPill(pillCam, "bad", "Camera: error");
-      log("Camera error: " + (e?.message || e), "err");
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+
+      running = true;
+      runDetectionLoop();
+    }catch(err){
+      console.error(err);
+      setPill(camPill, "Camera: error", "bad");
+      log(`CAMERA ERROR: ${err?.message || err}`, "bad");
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
     }
   }
 
-  function stopCamera() {
+  function stopCamera(){
     running = false;
-    btnStart.disabled = false;
-    btnStop.disabled = true;
-
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null;
+    if (detectTimer) { clearTimeout(detectTimer); detectTimer = null; }
+    if (stream){
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
     video.srcObject = null;
 
     tracks.clear();
-    seenIds.clear();
-    nextTrackId = 1;
+    uniqueIds.clear();
+    peopleNowEl.textContent = "0";
+    tracksNowEl.textContent = "0";
+    uniqueSeenEl.textContent = "0";
 
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    setPill(pillCam, "bad", "Camera: stopped");
-    log("Camera stopped. Session reset.");
+
+    setPill(camPill, "Camera: stopped", "bad");
+    log("Camera stopped.", "warn");
+
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
   }
 
-  // ---------- Bind buttons ----------
-  btnStart.addEventListener("click", startCamera);
-  btnStop.addEventListener("click", stopCamera);
+  // -----------------------------
+  // Airtable via /api/log
+  // -----------------------------
+  async function postToAirtable(count, extra = {}){
+    const payload = {
+      people_count: count,
+      timestamp: new Date().toISOString(),
+      ...extra
+    };
 
-  log("Page loaded. Click Start Camera.");
-})();
+    const r = await fetch("/api/log", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await r.text();
+    if (!r.ok) throw new Error(`Airtable /api/log failed (${r.status}): ${text.slice(0,180)}`);
+    return text;
+  }
+
+  async function validateConnections(){
+    validateBtn.disabled = true;
+    try{
+      log("Validating connections… (sending 9999)", "info");
+      setPill(airPill, "Airtable: testing…", "warn");
+      await postToAirtable(9999, { test: true });
+      setPill(airPill, "Airtable: ok (sent 9999)", "ok");
+      log("Connections OK: Airtable write works.", "ok");
+    }catch(err){
+      console.error(err);
+      setPill(airPill, "Airtable: error", "bad");
+      log(`AIRTABLE ERROR: ${err?.message || err}`, "bad");
+    }finally{
+      validateBtn.disabled = false;
+    }
+  }
+
+  // -----------------------------
+  // Detection loop
+  // -----------------------------
+  let lastSentCount = null;
+  let lastSendAt = 0;
+
+  async function runDetectionLoop(){
+    const tick = async () => {
+      if (!running) return;
+
+      try{
+        // Ensure video has metadata
+        if (!video.videoWidth || !video.videoHeight){
+          detectTimer = setTimeout(tick, DETECT_EVERY_MS);
+          return;
+        }
+
+        // Detect
+        const preds = await model.detect(video);
+
+        // Keep only person class above threshold
+        const people = preds
+          .filter(p => p.class === "person" && (p.score ?? 0) >= SCORE_THRESHOLD)
+          .map(p => {
+            const [x,y,w,h] = p.bbox; // in video pixel coords
+            return { x, y, w, h, score: p.score ?? 0 };
+          });
+
+        updateTracks(people);
+        drawTracks();
+
+        // Stable count = tracks.size
+        const stableCount = tracks.size;
+
+        peopleNowEl.textContent = String(stableCount);
+        tracksNowEl.textContent = String(tracks.size);
+        uniqueSeenEl.textContent = String(uniqueIds.size);
+
+        // Airtable push (debounced)
+        const now = Date.now();
+        const shouldSend =
+          (!SEND_ON_CHANGE_ONLY || stableCount !== lastSentCount) &&
+          (now - lastSendAt >= SEND_EVERY_MS);
+
+        if (shouldSend){
+          try{
+            await postToAirtable(stableCount, { unique_seen: uniqueIds.size });
+            setPill(airPill, "Airtable: ok", "ok");
+            log(`Logged to Airtable: people_count=${stableCount}`, "ok");
+            lastSentCount = stableCount;
+            lastSendAt = now;
+          }catch(err){
+            setPill(airPill, "Airtable: error", "bad");
+            log(`AIRTABLE ERROR: ${err?.message || err}`, "bad");
+          }
+        }
+      }catch(err){
+        console.error(err);
+        log(`PAGE ERROR: ${err?.message || err}`, "bad");
+      }finally{
+        detectTimer = setTimeout(tick, DETECT_EVERY_MS);
+      }
+    };
+
+    tick();
+  }
+
+  // -----------------------------
+  // Wire buttons + init
+  // -----------------------------
+  startBtn.addEventListener("click", startCamera);
+  stopBtn.addEventListener("click", stopCamera);
+  validateBtn.addEventListener("click", validateConnections);
+
+  window.addEventListener("resize", () => {
+    if (video.videoWidth) drawTracks();
+  });
+
+  // Initial state
+  (async () => {
+    log("Page loaded. Click 'Start Camera' to begin.");
+    setPill(airPill, "Airtable: unknown", "warn");
+    // Load model lazily on start to reduce initial wait. If you want eager load, uncomment:
+    // await loadModel();
+  })();
 </script>
 </body>
 </html>
