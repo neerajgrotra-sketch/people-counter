@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Live People Counter</title>
   <style>
-    :root { --bg:#0b1020; --card:#0f1730; --text:#e8eefc; --muted:#a9b4d0; --ok:#20c997; --bad:#ff6b6b; --btn:#2f6bff; }
+    :root { --bg:#0b1020; --card:#0f1730; --text:#e8eefc; --muted:#a9b4d0; --ok:#20c997; --bad:#ff6b6b; --btn:#2f6bff; --warn:#ffd43b; }
     body { margin:0; font-family: ui-sans-serif, system-ui, Arial; background: radial-gradient(1200px 700px at 20% 0%, #13204a 0%, var(--bg) 55%); color:var(--text); }
     .wrap { max-width: 1100px; margin: 28px auto; padding: 0 16px; }
     h1 { margin: 0 0 6px; font-size: 40px; letter-spacing: .2px; }
@@ -22,6 +22,7 @@
     .pill { border-radius: 999px; padding: 8px 12px; font-weight: 700; font-size: 13px; border:1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); }
     .pill.ok { color: var(--ok); border-color: rgba(32,201,151,.45); }
     .pill.bad { color: var(--bad); border-color: rgba(255,107,107,.5); }
+    .pill.warn { color: var(--warn); border-color: rgba(255,212,59,.55); }
     .big { font-size: 54px; font-weight: 900; margin: 8px 0 0; }
     .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
     .logs { margin-top: 14px; background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.10); border-radius: 14px; padding: 12px; max-height: 240px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.35; white-space: pre-wrap; }
@@ -30,13 +31,18 @@
     .kpiVal { font-size: 40px; font-weight: 900; margin-top: 6px; }
     .small { color: var(--muted); font-size: 13px; }
     .footer { margin-top: 10px; color: var(--muted); font-size: 13px; }
+
+    .settings { margin-top: 10px; display:grid; gap:10px; }
+    .settingRow { display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; }
+    input[type="range"]{ width: 100%; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Live People Counter</h1>
-    <p class="sub">Webcam + COCO-SSD person detection + simple tracking IDs + logs to Airtable via <code>/api/log</code>.</p>
+    <p class="sub">Webcam + COCO-SSD person detection + <b>stable tracking IDs</b> (confirmed tracks) + logs to Airtable via <code>/api/log</code>.</p>
 
     <div class="grid">
       <div class="card">
@@ -54,7 +60,10 @@
           <button id="testBtn" class="secondary">Validate (send 9999)</button>
         </div>
 
-        <div class="footer">Sends an update every <b>5s</b> when count changes. Tracking IDs are best-effort (wide shots can be noisy).</div>
+        <div class="footer">
+          Detection runs every <b><span id="detMsLabel">250</span>ms</b>. People count uses <b>confirmed tracks</b> (reduces churn in wide shots).
+          Tentative tracks are drawn in <span style="color:var(--warn);font-weight:800;">yellow</span>.
+        </div>
 
         <div class="logs" id="logs"></div>
       </div>
@@ -68,19 +77,43 @@
           </div>
 
           <div class="kpiBox">
-            <div class="label">People Detected (current)</div>
+            <div class="label">People Detected (confirmed)</div>
             <div class="kpiVal" id="peopleCount">0</div>
+            <div class="small">Counts only confirmed tracks (stable).</div>
           </div>
 
           <div class="kpiBox">
-            <div class="label">Active Track IDs (current)</div>
+            <div class="label">Active Track IDs (all)</div>
             <div class="kpiVal" id="activeIds">0</div>
           </div>
 
           <div class="kpiBox">
-            <div class="label">Unique IDs Seen (session)</div>
+            <div class="label">Unique IDs Seen (confirmed, session)</div>
             <div class="kpiVal" id="uniqueSeen">0</div>
           </div>
+
+          <div class="kpiBox">
+            <div class="label">Tracking Settings</div>
+            <div class="settings">
+              <div class="settingRow">
+                <div class="small">Min person score: <span class="mono" id="minScoreLabel">0.35</span></div>
+                <input id="minScore" type="range" min="0.20" max="0.70" step="0.01" value="0.35">
+              </div>
+              <div class="settingRow">
+                <div class="small">Confirm hits (N): <span class="mono" id="confirmHitsLabel">3</span></div>
+                <input id="confirmHits" type="range" min="2" max="6" step="1" value="3">
+              </div>
+              <div class="settingRow">
+                <div class="small">Track TTL (ms): <span class="mono" id="ttlLabel">2500</span></div>
+                <input id="ttlMs" type="range" min="1200" max="6000" step="100" value="2500">
+              </div>
+              <div class="settingRow">
+                <div class="small">Detect interval (ms): <span class="mono" id="detMsLabel2">250</span></div>
+                <input id="detMs" type="range" min="150" max="600" step="25" value="250">
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -97,21 +130,20 @@
 
     function ts() { return new Date().toISOString(); }
     function log(msg, level="info") {
-      const line = `[${ts()}] ${level === "error" ? "✖" : level === "ok" ? "✓" : "i"} ${msg}\n`;
+      const icon = level === "error" ? "✖" : level === "ok" ? "✓" : "i";
+      const line = `[${ts()}] ${icon} ${msg}\n`;
       logsEl.textContent = line + logsEl.textContent;
     }
     function setPill(el, text, state=null) {
       el.textContent = text;
-      el.classList.remove("ok","bad");
+      el.classList.remove("ok","bad","warn");
       if (state === "ok") el.classList.add("ok");
       if (state === "bad") el.classList.add("bad");
+      if (state === "warn") el.classList.add("warn");
     }
 
     // ====== Clock ======
-    function tickClock() {
-      const d = new Date();
-      $("clock").textContent = d.toLocaleString();
-    }
+    function tickClock() { $("clock").textContent = new Date().toLocaleString(); }
     setInterval(tickClock, 250);
     tickClock();
 
@@ -122,7 +154,6 @@
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify(payload)
       });
-
       const text = await res.text();
       if (!res.ok) throw new Error(`API /api/log failed (${res.status}): ${text.slice(0,200)}`);
       return text;
@@ -148,10 +179,59 @@
     let model = null;
     let running = false;
 
-    // Tracking: IoU matching frame-to-frame (simple + cheap)
-    let tracks = new Map(); // id -> {bbox:[x,y,w,h], lastSeen:number}
+    // ====== Settings (live-tunable) ======
+    const settings = {
+      minScore: 0.35,
+      confirmHits: 3,
+      trackTtlMs: 2500,
+      detectIntervalMs: 250,
+      smoothAlpha: 0.35,
+      // Matching gates
+      maxCenterDistMult: 1.6, // allow center drift up to 1.6 * max(w,h)
+      // Score weighting: IoU + distance similarity
+      wIou: 0.70,
+      wDist: 0.30,
+      acceptScore: 0.22, // combined match score threshold
+    };
+
+    function wireSettings() {
+      const minScore = $("minScore");
+      const confirmHits = $("confirmHits");
+      const ttlMs = $("ttlMs");
+      const detMs = $("detMs");
+
+      const syncLabels = () => {
+        $("minScoreLabel").textContent = settings.minScore.toFixed(2);
+        $("confirmHitsLabel").textContent = String(settings.confirmHits);
+        $("ttlLabel").textContent = String(settings.trackTtlMs);
+        $("detMsLabel").textContent = String(settings.detectIntervalMs);
+        $("detMsLabel2").textContent = String(settings.detectIntervalMs);
+      };
+
+      minScore.addEventListener("input", () => { settings.minScore = parseFloat(minScore.value); syncLabels(); });
+      confirmHits.addEventListener("input", () => { settings.confirmHits = parseInt(confirmHits.value, 10); syncLabels(); });
+      ttlMs.addEventListener("input", () => { settings.trackTtlMs = parseInt(ttlMs.value, 10); syncLabels(); });
+      detMs.addEventListener("input", () => { settings.detectIntervalMs = parseInt(detMs.value, 10); syncLabels(); });
+
+      syncLabels();
+    }
+    wireSettings();
+
+    // ====== Tracking (stable IDs) ======
+    /**
+     * Track object:
+     * {
+     *   id: number,
+     *   bbox: [x,y,w,h],
+     *   lastSeen: number,
+     *   hits: number,
+     *   misses: number,
+     *   confirmed: boolean
+     * }
+     */
+    let tracks = new Map(); // id -> track
     let nextId = 1;
-    const seenIds = new Set();
+    const seenConfirmedIds = new Set();
 
     function resizeCanvasToVideo() {
       const w = video.videoWidth || 0;
@@ -162,7 +242,6 @@
     }
 
     function iou(a, b) {
-      // a,b: [x,y,w,h]
       const ax1=a[0], ay1=a[1], ax2=a[0]+a[2], ay2=a[1]+a[3];
       const bx1=b[0], by1=b[1], bx2=b[0]+b[2], by2=b[1]+b[3];
       const ix1=Math.max(ax1,bx1), iy1=Math.max(ay1,by1), ix2=Math.min(ax2,bx2), iy2=Math.min(ay2,by2);
@@ -172,59 +251,130 @@
       return ua <= 0 ? 0 : inter/ua;
     }
 
-    function assignTracks(dets) {
-      // dets: [{bbox:[x,y,w,h], score}]
+    function centerOf(box) {
+      return [box[0] + box[2]/2, box[1] + box[3]/2];
+    }
+
+    function smoothBox(oldBox, newBox, alpha) {
+      return [
+        oldBox[0] + (newBox[0]-oldBox[0]) * alpha,
+        oldBox[1] + (newBox[1]-oldBox[1]) * alpha,
+        oldBox[2] + (newBox[2]-oldBox[2]) * alpha,
+        oldBox[3] + (newBox[3]-oldBox[3]) * alpha,
+      ];
+    }
+
+    function matchScore(detBox, trackBox) {
+      // Distance gating (reduces ID swaps when people sit close)
+      const [dx,dy] = centerOf(detBox);
+      const [tx,ty] = centerOf(trackBox);
+      const dist = Math.hypot(dx-tx, dy-ty);
+
+      const scale = Math.max(trackBox[2], trackBox[3], 1);
+      const distNorm = dist / scale;
+      if (distNorm > settings.maxCenterDistMult) return -1; // reject outright
+
+      const i = iou(detBox, trackBox);
+
+      // Convert distance to similarity [0..1]
+      const distSim = 1 - Math.min(distNorm / settings.maxCenterDistMult, 1);
+
+      return settings.wIou * i + settings.wDist * distSim;
+    }
+
+    function updateTracks(detections) {
       const now = performance.now();
 
-      // expire stale tracks
-      for (const [id, t] of tracks.entries()) {
-        if (now - t.lastSeen > 1500) tracks.delete(id); // 1.5s timeout
-      }
-
+      // Mark all tracks as "unmatched" initially
+      const unmatchedTrackIds = new Set(tracks.keys());
       const usedTrackIds = new Set();
-      const results = [];
 
-      for (const d of dets) {
+      // We'll store match results: detIndex -> trackId
+      const detToTrack = new Array(detections.length).fill(null);
+
+      // Greedy matching (works fine at 30–50 people with throttled detection)
+      for (let di = 0; di < detections.length; di++) {
+        const d = detections[di];
         let bestId = null;
-        let bestIou = 0;
+        let bestScore = -1;
 
         for (const [id, t] of tracks.entries()) {
           if (usedTrackIds.has(id)) continue;
-          const v = iou(d.bbox, t.bbox);
-          if (v > bestIou) { bestIou = v; bestId = id; }
+
+          const s = matchScore(d.bbox, t.bbox);
+          if (s > bestScore) {
+            bestScore = s;
+            bestId = id;
+          }
         }
 
-        if (bestId && bestIou >= 0.25) {
-          // match existing
-          const t = tracks.get(bestId);
-          t.bbox = d.bbox;
-          t.lastSeen = now;
+        if (bestId !== null && bestScore >= settings.acceptScore) {
+          detToTrack[di] = bestId;
           usedTrackIds.add(bestId);
-          results.push({ id: bestId, bbox: d.bbox });
-        } else {
-          // new track
-          const id = nextId++;
-          tracks.set(id, { bbox: d.bbox, lastSeen: now });
-          usedTrackIds.add(id);
-          seenIds.add(id);
-          results.push({ id, bbox: d.bbox });
+          unmatchedTrackIds.delete(bestId);
         }
       }
 
-      return results;
+      // Update matched tracks
+      for (let di = 0; di < detections.length; di++) {
+        const d = detections[di];
+        const matchedId = detToTrack[di];
+
+        if (matchedId !== null) {
+          const t = tracks.get(matchedId);
+
+          t.bbox = smoothBox(t.bbox, d.bbox, settings.smoothAlpha);
+          t.lastSeen = now;
+          t.hits += 1;
+          t.misses = 0;
+
+          if (!t.confirmed && t.hits >= settings.confirmHits) {
+            t.confirmed = true;
+            seenConfirmedIds.add(t.id);
+          }
+
+          tracks.set(matchedId, t);
+        } else {
+          // Create new tentative track
+          const id = nextId++;
+          tracks.set(id, {
+            id,
+            bbox: d.bbox,
+            lastSeen: now,
+            hits: 1,
+            misses: 0,
+            confirmed: false,
+          });
+        }
+      }
+
+      // Age unmatched tracks
+      for (const id of unmatchedTrackIds) {
+        const t = tracks.get(id);
+        t.misses += 1;
+
+        // Keep for TTL to survive brief missed detections (occlusion, lighting)
+        if (now - t.lastSeen > settings.trackTtlMs) {
+          tracks.delete(id);
+        } else {
+          tracks.set(id, t);
+        }
+      }
     }
 
-    function drawOverlay(tracked) {
+    function drawOverlay() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.lineWidth = 3;
       ctx.font = "16px ui-monospace, Menlo, Consolas, monospace";
 
-      for (const t of tracked) {
+      for (const [id, t] of tracks.entries()) {
         const [x,y,w,h] = t.bbox;
-        ctx.strokeStyle = "#00e5a8";
+
+        const isConfirmed = t.confirmed;
+        ctx.strokeStyle = isConfirmed ? "#00e5a8" : "#ffd43b";
         ctx.strokeRect(x,y,w,h);
 
-        const label = `ID ${t.id}`;
+        const label = isConfirmed ? `ID ${id}` : `ID ${id} (T)`;
         const pad = 4;
         const tw = ctx.measureText(label).width;
         const th = 18;
@@ -237,38 +387,55 @@
       }
     }
 
-    let latestCount = 0;
+    function confirmedCount() {
+      let c = 0;
+      for (const t of tracks.values()) if (t.confirmed) c++;
+      return c;
+    }
+
+    // ====== Detection loop (throttled) ======
+    let lastDetectAt = 0;
+    let latestConfirmed = 0;
     let lastSent = -1;
 
-    async function detectLoop() {
-      if (!running) return;
-      if (!model || video.readyState < 2) { requestAnimationFrame(detectLoop); return; }
-
-      resizeCanvasToVideo();
+    async function detectTick() {
+      if (!model || video.readyState < 2) return;
 
       try {
         const preds = await model.detect(video);
-        // keep only persons with decent confidence
+
         const persons = preds
-          .filter(p => p.class === "person" && (p.score ?? 0) >= 0.35)
+          .filter(p => p.class === "person" && (p.score ?? 0) >= settings.minScore)
           .map(p => ({ bbox: p.bbox, score: p.score }));
 
-        const tracked = assignTracks(persons);
+        updateTracks(persons);
+        drawOverlay();
 
-        drawOverlay(tracked);
-
-        latestCount = tracked.length;
-        $("peopleCount").textContent = String(latestCount);
+        latestConfirmed = confirmedCount();
+        $("peopleCount").textContent = String(latestConfirmed);
         $("activeIds").textContent = String(tracks.size);
-        $("uniqueSeen").textContent = String(seenIds.size);
+        $("uniqueSeen").textContent = String(seenConfirmedIds.size);
 
       } catch (e) {
         log("Detection error: " + e.message, "error");
       }
-
-      requestAnimationFrame(detectLoop);
     }
 
+    function loop() {
+      if (!running) return;
+      requestAnimationFrame(loop);
+
+      resizeCanvasToVideo();
+
+      const now = performance.now();
+      if (now - lastDetectAt < settings.detectIntervalMs) return;
+      lastDetectAt = now;
+
+      // Fire and forget per tick (keeps UI responsive)
+      detectTick();
+    }
+
+    // ====== Camera ======
     async function startCamera() {
       try {
         $("startBtn").disabled = true;
@@ -289,7 +456,8 @@
         log("Camera started.", "ok");
 
         running = true;
-        detectLoop();
+        lastDetectAt = 0;
+        loop();
       } catch (e) {
         $("startBtn").disabled = false;
         $("stopBtn").disabled = true;
@@ -300,6 +468,7 @@
 
     function stopCamera() {
       running = false;
+
       if (stream) {
         stream.getTracks().forEach(t => t.stop());
         stream = null;
@@ -308,8 +477,13 @@
       ctx.clearRect(0,0,canvas.width,canvas.height);
 
       tracks.clear();
-      // keep seenIds for session total unless you want reset; comment next line to keep session history
-      // seenIds.clear();
+      // Keep session unique IDs unless you want to reset:
+      // seenConfirmedIds.clear();
+
+      latestConfirmed = 0;
+      $("peopleCount").textContent = "0";
+      $("activeIds").textContent = "0";
+      $("uniqueSeen").textContent = String(seenConfirmedIds.size);
 
       $("startBtn").disabled = false;
       $("stopBtn").disabled = true;
@@ -317,20 +491,20 @@
       log("Camera stopped.");
     }
 
-    // ====== periodic airtable push (only when count changes) ======
+    // ====== Airtable push (only when confirmed count changes) ======
     setInterval(async () => {
       if (!running) return;
-      if (latestCount === lastSent) return;
+      if (latestConfirmed === lastSent) return;
 
       try {
         setPill($("airPill"), "Airtable: sending…");
         await postToAirtable({
-          people_count: latestCount,
+          people_count: latestConfirmed,
           timestamp: new Date().toISOString()
         });
-        lastSent = latestCount;
+        lastSent = latestConfirmed;
         setPill($("airPill"), "Airtable: ok", "ok");
-        log(`Logged to Airtable: people_count=${latestCount}`, "ok");
+        log(`Logged to Airtable: people_count=${latestConfirmed}`, "ok");
       } catch (e) {
         setPill($("airPill"), "Airtable: error", "bad");
         log("Airtable error: " + e.message, "error");
@@ -342,10 +516,7 @@
       try {
         setPill($("modelPill"), "Model: loading…");
         log("Loading COCO-SSD model…");
-
-        // FIX for your error: use cocoSsd.load() (CDN global), NOT coco.load()
-        model = await cocoSsd.load();
-
+        model = await cocoSsd.load(); // correct CDN global
         setPill($("modelPill"), "Model: ready", "ok");
         log("Model loaded successfully.", "ok");
       } catch (e) {
@@ -354,7 +525,7 @@
       }
     }
 
-    // ====== wire buttons ======
+    // ====== Wire buttons ======
     $("startBtn").addEventListener("click", startCamera);
     $("stopBtn").addEventListener("click", stopCamera);
     $("testBtn").addEventListener("click", validateConnections);
